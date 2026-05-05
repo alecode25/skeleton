@@ -13,82 +13,65 @@
     <div id="loading-overlay">
         <div class="loader-content">
             <div class="loader-ring"></div>
-            <p class="loader-text">INIZIALIZZAZIONE MODELLO...</p>
+            <p class="loader-text">CARICAMENTO MODELLO...</p>
         </div>
     </div>
 
-    <header>
-        <div class="brand">
-            <span class="brand-icon">◈</span>
-            <span class="brand-name">SKELETON</span>
-        </div>
-        <div class="status-bar">
-            <span id="status-dot" class="status-dot"></span>
-            <span id="status-text">IN ATTESA</span>
-        </div>
-    </header>
+    <div id="viewport">
+        <video id="video" playsinline></video>
+        <canvas id="canvas"></canvas>
 
-    <main>
-        <div class="viewport-container">
-            <video id="video" playsinline></video>
-            <canvas id="canvas"></canvas>
-
-            <div class="hud-overlay">
-
-                <!-- Score panel -->
-                <div class="score-panel">
-                    <svg class="score-ring" viewBox="0 0 120 120">
-                        <circle class="ring-bg" cx="60" cy="60" r="50"/>
-                        <circle id="ring-progress" class="ring-progress" cx="60" cy="60" r="50"/>
-                    </svg>
-                    <div class="score-inner">
-                        <span id="score-value">—</span>
-                        <span class="score-label">QUALITÀ</span>
-                    </div>
-                </div>
-
-                <!-- Landmarks panel -->
-                <div class="landmarks-panel">
-                    <div class="panel-title">PUNTI SCHIENA</div>
-                    <div class="landmark-row" id="lm-spalla-sx">
-                        <span class="lm-dot"></span>
-                        <span class="lm-name">SPALLA SX</span>
-                        <span class="lm-val">—</span>
-                    </div>
-                    <div class="landmark-row" id="lm-spalla-dx">
-                        <span class="lm-dot"></span>
-                        <span class="lm-name">SPALLA DX</span>
-                        <span class="lm-val">—</span>
-                    </div>
-                    <div class="landmark-row" id="lm-anca-sx">
-                        <span class="lm-dot"></span>
-                        <span class="lm-name">ANCA SX</span>
-                        <span class="lm-val">—</span>
-                    </div>
-                    <div class="landmark-row" id="lm-anca-dx">
-                        <span class="lm-dot"></span>
-                        <span class="lm-name">ANCA DX</span>
-                        <span class="lm-val">—</span>
-                    </div>
-                    <div class="landmark-row" id="lm-colonna">
-                        <span class="lm-dot"></span>
-                        <span class="lm-name">COLONNA</span>
-                        <span class="lm-val">—</span>
-                    </div>
-                </div>
-
-                <!-- Feedback banner -->
-                <div id="feedback-banner" class="feedback-banner">
-                    <span id="feedback-text">Posizionati davanti alla fotocamera</span>
-                </div>
-
+        <!-- Top bar -->
+        <div id="topbar">
+            <div class="brand">◈ SKELETON</div>
+            <div id="status-pill" class="status-pill">
+                <span id="status-dot" class="sdot"></span>
+                <span id="status-text">IN ATTESA</span>
             </div>
         </div>
-    </main>
+
+        <!-- Spine angle badge -->
+        <div id="angle-badge">
+            <div class="badge-value" id="spine-angle-val">—°</div>
+            <div class="badge-label">COLONNA</div>
+        </div>
+
+        <!-- Metrics panel -->
+        <div id="metrics-panel">
+            <div class="metric-row" id="m-lat">
+                <span class="m-icon">⟷</span>
+                <span class="m-label">INCL. LAT.</span>
+                <span class="m-val" id="v-lat">—</span>
+            </div>
+            <div class="metric-row" id="m-fwd">
+                <span class="m-icon">↗</span>
+                <span class="m-label">LEAN AVANTI</span>
+                <span class="m-val" id="v-fwd">—</span>
+            </div>
+            <div class="metric-row" id="m-spalle">
+                <span class="m-icon">⇌</span>
+                <span class="m-label">SIM. SPALLE</span>
+                <span class="m-val" id="v-spalle">—</span>
+            </div>
+            <div class="metric-row" id="m-score">
+                <span class="m-icon">◎</span>
+                <span class="m-label">RILEVAMENTO</span>
+                <span class="m-val" id="v-score">—</span>
+            </div>
+        </div>
+
+        <!-- Warning banner -->
+        <div id="warning-banner" class="hidden">
+            <span id="warning-text"></span>
+        </div>
+
+        <!-- Good posture indicator -->
+        <div id="good-banner" class="hidden">✓ POSTURA CORRETTA</div>
+
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="script.js"></script>
 </body>
 </html>
-    
