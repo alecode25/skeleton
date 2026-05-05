@@ -19,281 +19,250 @@ const vScore  = document.getElementById('v-score');
 const mLat    = document.getElementById('m-lat');
 const mFwd    = document.getElementById('m-fwd');
 const mSpalle = document.getElementById('m-spalle');
+const lblLat    = document.getElementById('m-lat').querySelector('.m-label');
+const lblFwd    = document.getElementById('lbl-fwd');
+const lblSpalle = document.getElementById('lbl-spalle');
 
-// Metric label spans (we'll update text based on view mode)
-const lblLat    = mLat.querySelector('.m-label');
-const lblFwd    = mFwd.querySelector('.m-label');
-const lblSpalle = mSpalle.querySelector('.m-label');
-
-// ── Skeleton colors ───────────────────────────────────────────────────────────
-
-const JOINT_COL = {
-    0:'#ff6b6b',  1:'#ff6b6b',  2:'#ff6b6b',  3:'#ff6b6b',  4:'#ff6b6b',
-    5:'#ff6b6b',  6:'#ff6b6b',  7:'#ff6b6b',  8:'#ff6b6b',  9:'#ff6b6b', 10:'#ff6b6b',
-    11:'#ff9f43', 12:'#ff9f43',
-    13:'#4b9eff', 14:'#4b9eff', 15:'#4b9eff', 16:'#4b9eff',
-    17:'#4b9eff', 18:'#4b9eff', 19:'#4b9eff', 20:'#4b9eff', 21:'#4b9eff', 22:'#4b9eff',
-    23:'#ff9f43', 24:'#ff9f43',
-    25:'#69f0ae', 26:'#69f0ae', 27:'#69f0ae', 28:'#69f0ae',
-    29:'#69f0ae', 30:'#69f0ae', 31:'#69f0ae', 32:'#69f0ae',
+// ── MoveNet keypoint indices ──────────────────────────────────────────────────
+const KP = {
+    NOSE:           0,
+    L_EYE: 1, R_EYE: 2, L_EAR: 3, R_EAR: 4,
+    L_SHOULDER:     5,  R_SHOULDER:  6,
+    L_ELBOW:        7,  R_ELBOW:     8,
+    L_WRIST:        9,  R_WRIST:    10,
+    L_HIP:         11,  R_HIP:      12,
+    L_KNEE:        13,  R_KNEE:     14,
+    L_ANKLE:       15,  R_ANKLE:    16,
 };
 
+// ── Skeleton visuals ──────────────────────────────────────────────────────────
+// Index → color
+const JOINT_COL = [
+    '#ff6b6b',  // 0  nose
+    '#ff6b6b',  // 1  l_eye
+    '#ff6b6b',  // 2  r_eye
+    '#ff6b6b',  // 3  l_ear
+    '#ff6b6b',  // 4  r_ear
+    '#ff9f43',  // 5  l_shoulder  ← key
+    '#ff9f43',  // 6  r_shoulder  ← key
+    '#4b9eff',  // 7  l_elbow
+    '#4b9eff',  // 8  r_elbow
+    '#4b9eff',  // 9  l_wrist
+    '#4b9eff',  // 10 r_wrist
+    '#ff9f43',  // 11 l_hip       ← key
+    '#ff9f43',  // 12 r_hip       ← key
+    '#69f0ae',  // 13 l_knee
+    '#69f0ae',  // 14 r_knee
+    '#69f0ae',  // 15 l_ankle
+    '#69f0ae',  // 16 r_ankle
+];
+const KEY_JOINTS = new Set([5, 6, 11, 12]);
+
 const CONNECTIONS = [
-    { a:0,  b:1,  col:'rgba(255,107,107,0.55)' },
-    { a:1,  b:2,  col:'rgba(255,107,107,0.55)' },
-    { a:2,  b:3,  col:'rgba(255,107,107,0.55)' },
-    { a:3,  b:7,  col:'rgba(255,107,107,0.55)' },
-    { a:0,  b:4,  col:'rgba(255,107,107,0.55)' },
-    { a:4,  b:5,  col:'rgba(255,107,107,0.55)' },
-    { a:5,  b:6,  col:'rgba(255,107,107,0.55)' },
-    { a:6,  b:8,  col:'rgba(255,107,107,0.55)' },
-    { a:9,  b:10, col:'rgba(255,107,107,0.55)' },
-    { a:11, b:12, col:'rgba(0,229,255,0.75)',   w:2.5 },
-    { a:11, b:13, col:'rgba(75,158,255,0.85)',  w:2.5 },
-    { a:13, b:15, col:'rgba(75,158,255,0.85)',  w:2.5 },
-    { a:15, b:17, col:'rgba(75,158,255,0.65)'  },
-    { a:15, b:19, col:'rgba(75,158,255,0.65)'  },
-    { a:15, b:21, col:'rgba(75,158,255,0.65)'  },
-    { a:17, b:19, col:'rgba(75,158,255,0.45)'  },
-    { a:12, b:14, col:'rgba(75,158,255,0.85)',  w:2.5 },
-    { a:14, b:16, col:'rgba(75,158,255,0.85)',  w:2.5 },
-    { a:16, b:18, col:'rgba(75,158,255,0.65)'  },
-    { a:16, b:20, col:'rgba(75,158,255,0.65)'  },
-    { a:16, b:22, col:'rgba(75,158,255,0.65)'  },
-    { a:18, b:20, col:'rgba(75,158,255,0.45)'  },
-    { a:11, b:23, col:'rgba(255,159,67,0.85)',  w:2.5 },
-    { a:12, b:24, col:'rgba(255,159,67,0.85)',  w:2.5 },
-    { a:23, b:24, col:'rgba(0,229,255,0.75)',   w:2.5 },
-    { a:23, b:25, col:'rgba(105,240,174,0.85)', w:2.5 },
-    { a:25, b:27, col:'rgba(105,240,174,0.85)', w:2.5 },
-    { a:27, b:29, col:'rgba(105,240,174,0.65)'  },
-    { a:29, b:31, col:'rgba(105,240,174,0.55)'  },
-    { a:27, b:31, col:'rgba(105,240,174,0.45)'  },
-    { a:24, b:26, col:'rgba(105,240,174,0.85)', w:2.5 },
-    { a:26, b:28, col:'rgba(105,240,174,0.85)', w:2.5 },
-    { a:28, b:30, col:'rgba(105,240,174,0.65)'  },
-    { a:30, b:32, col:'rgba(105,240,174,0.55)'  },
-    { a:28, b:32, col:'rgba(105,240,174,0.45)'  },
+    // Face
+    { a:3,  b:1,  col:'rgba(255,107,107,0.55)' },
+    { a:1,  b:0,  col:'rgba(255,107,107,0.55)' },
+    { a:0,  b:2,  col:'rgba(255,107,107,0.55)' },
+    { a:2,  b:4,  col:'rgba(255,107,107,0.55)' },
+    // Shoulder bar
+    { a:5,  b:6,  col:'rgba(0,229,255,0.80)',   w:2.5 },
+    // Left arm
+    { a:5,  b:7,  col:'rgba(75,158,255,0.85)',  w:2.5 },
+    { a:7,  b:9,  col:'rgba(75,158,255,0.85)',  w:2.5 },
+    // Right arm
+    { a:6,  b:8,  col:'rgba(75,158,255,0.85)',  w:2.5 },
+    { a:8,  b:10, col:'rgba(75,158,255,0.85)',  w:2.5 },
+    // Torso
+    { a:5,  b:11, col:'rgba(255,159,67,0.85)',  w:2.5 },
+    { a:6,  b:12, col:'rgba(255,159,67,0.85)',  w:2.5 },
+    // Hip bar
+    { a:11, b:12, col:'rgba(0,229,255,0.80)',   w:2.5 },
+    // Left leg
+    { a:11, b:13, col:'rgba(105,240,174,0.85)', w:2.5 },
+    { a:13, b:15, col:'rgba(105,240,174,0.85)', w:2.5 },
+    // Right leg
+    { a:12, b:14, col:'rgba(105,240,174,0.85)', w:2.5 },
+    { a:14, b:16, col:'rgba(105,240,174,0.85)', w:2.5 },
 ];
 
 // ── View mode detection ───────────────────────────────────────────────────────
-// Strategy: narrow shoulder X-span OR large visibility difference → profile
 
 let _stableView = 'frontal';
 let _viewCount  = 0;
-const VIEW_HYSTERESIS = 10; // frames needed to confirm view switch
 
 function detectViewMode(lm) {
-    const l11 = lm[11], l12 = lm[12];
-    if (!l11 || !l12 || l11.visibility < 0.2 || l12.visibility < 0.2) return _stableView;
+    const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
+    if (!ls || !rs) return _stableView;
 
-    const visDiff    = Math.abs(l11.visibility - l12.visibility);
-    const xSpan      = Math.abs(l11.x - l12.x);
+    const visDiff  = Math.abs(ls.score - rs.score);
+    // Normalized shoulder X-span (close to 0 = profile)
+    const xSpan    = Math.abs(ls.x - rs.x);
 
     let detected = 'frontal';
     if (visDiff > 0.28 || xSpan < 0.09) {
-        // One shoulder much more visible or shoulders very close in X = profile
-        detected = (l11.visibility >= l12.visibility) ? 'profile-left' : 'profile-right';
+        detected = ls.score >= rs.score ? 'profile-left' : 'profile-right';
     }
 
     if (detected === _stableView) {
-        _viewCount = Math.min(_viewCount + 1, VIEW_HYSTERESIS * 2);
+        _viewCount = Math.min(_viewCount + 1, 20);
     } else {
         _viewCount--;
-        if (_viewCount <= 0) {
-            _stableView = detected;
-            _viewCount  = VIEW_HYSTERESIS;
-        }
+        if (_viewCount <= 0) { _stableView = detected; _viewCount = 10; }
     }
     return _stableView;
 }
 
 // ── Angles ────────────────────────────────────────────────────────────────────
 
-function computeAngles(lm) {
-    const l11 = lm[11], l12 = lm[12];
-    const l23 = lm[23], l24 = lm[24];
-    if (!l11 || !l12 || !l23 || !l24) return { screen: 0, depth: 0 };
+function computeScreenAngle(lm) {
+    const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
+    const lh = lm[KP.L_HIP],     rh = lm[KP.R_HIP];
+    if (!ls || !rs || !lh || !rh) return 0;
 
-    const sX = (l11.x + l12.x) / 2,  hX = (l23.x + l24.x) / 2;
-    const sY = (l11.y + l12.y) / 2,  hY = (l23.y + l24.y) / 2;
-    const sZ = (l11.z + l12.z) / 2,  hZ = (l23.z + l24.z) / 2;
-
-    // screen: angle of spine in XY plane from vertical (rad→deg)
-    // positive = tilted right, negative = tilted left
-    const dX = sX - hX;
-    const dY = hY - sY; // positive: shoulders above hips (normal)
-    const screen = Math.atan2(dX, dY) * (180 / Math.PI);
-
-    // depth: angle in ZY plane from vertical (negative = leaning toward camera)
-    const dZ = sZ - hZ;
-    const depth = Math.atan2(dZ, dY) * (180 / Math.PI);
-
-    return { screen, depth };
+    const sX = (ls.x + rs.x) / 2, sY = (ls.y + rs.y) / 2;
+    const hX = (lh.x + rh.x) / 2, hY = (lh.y + rh.y) / 2;
+    // Vector hips→shoulders, angle from vertical (positive = tilted right)
+    return Math.atan2(sX - hX, hY - sY) * (180 / Math.PI);
 }
 
-// 3-point angle in degrees (vectors BA and BC)
-function angleBetween(A, B, C) {
-    const BAx = A.x - B.x, BAy = A.y - B.y;
-    const BCx = C.x - B.x, BCy = C.y - B.y;
-    const dot  = BAx * BCx + BAy * BCy;
-    const magA = Math.hypot(BAx, BAy);
-    const magC = Math.hypot(BCx, BCy);
-    if (magA === 0 || magC === 0) return null;
-    return Math.acos(Math.min(1, Math.max(-1, dot / (magA * magC)))) * (180 / Math.PI);
+function angleBetween3pts(A, B, C) {
+    const bax = A.x - B.x, bay = A.y - B.y;
+    const bcx = C.x - B.x, bcy = C.y - B.y;
+    const dot  = bax * bcx + bay * bcy;
+    const mag  = Math.hypot(bax, bay) * Math.hypot(bcx, bcy);
+    if (mag === 0) return null;
+    return Math.acos(Math.min(1, Math.max(-1, dot / mag))) * (180 / Math.PI);
 }
 
 // ── Posture analysis ──────────────────────────────────────────────────────────
 
 function analyzePosture(lm, viewMode) {
-    const l11 = lm[11], l12 = lm[12];
-    const l23 = lm[23], l24 = lm[24];
+    const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
+    const lh = lm[KP.L_HIP],     rh = lm[KP.R_HIP];
 
     const res = {
         visible: false, viewMode,
-        screenAngle: 0, depthAngle: 0,
-        shoulderAsym: 0, headFwd: 0,
+        screenAngle: 0,
+        shoulderAsym: 0, hipAsym: 0, headFwd: 0,
         score: 0, warnings: [], status: 'unknown',
     };
 
-    if (!l11 || !l12 || !l23 || !l24) return res;
+    if (!ls || !rs || !lh || !rh) return res;
 
-    const isProfile = viewMode !== 'frontal';
-    const nearS = isProfile
-        ? (viewMode === 'profile-left' ? l11 : l12)
-        : { x:(l11.x+l12.x)/2, y:(l11.y+l12.y)/2, visibility:(l11.visibility+l12.visibility)/2 };
-    const nearH = isProfile
-        ? (viewMode === 'profile-left' ? l23 : l24)
-        : { x:(l23.x+l24.x)/2, y:(l23.y+l24.y)/2, visibility:(l23.visibility+l24.visibility)/2 };
+    const isProfile  = viewMode !== 'frontal';
+    const nearS = isProfile ? (viewMode === 'profile-left' ? ls : rs) : null;
+    const nearH = isProfile ? (viewMode === 'profile-left' ? lh : rh) : null;
 
-    // Score: in profile use best visible side; in frontal use average
-    const sVis = isProfile
-        ? Math.max(l11.visibility, l12.visibility)
-        : (l11.visibility + l12.visibility) / 2;
-    const hVis = isProfile
-        ? Math.max(l23.visibility, l24.visibility)
-        : (l23.visibility + l24.visibility) / 2;
-    res.score = Math.round(((sVis + hVis) / 2) * 100);
+    // Score: best visible side in profile, average in frontal
+    const sScore = isProfile ? Math.max(ls.score, rs.score) : (ls.score + rs.score) / 2;
+    const hScore = isProfile ? Math.max(lh.score, rh.score) : (lh.score + rh.score) / 2;
+    res.score = Math.round(((sScore + hScore) / 2) * 100);
 
-    if (Math.min(nearS.visibility, nearH.visibility) < 0.25) return res;
-    res.visible = true;
+    const minVis = isProfile
+        ? Math.min(nearS?.score ?? 0, nearH?.score ?? 0)
+        : Math.min(ls.score, rs.score, lh.score, rh.score);
+    if (minVis < 0.2) return res;
 
-    const { screen, depth } = computeAngles(lm);
-    res.screenAngle  = screen;
-    res.depthAngle   = depth;
-    res.shoulderAsym = Math.abs(l12.y - l11.y) * 100;
+    res.visible      = true;
+    res.screenAngle  = computeScreenAngle(lm);
+    res.shoulderAsym = Math.abs(ls.y - rs.y) * 100;
+    res.hipAsym      = Math.abs(lh.y - rh.y) * 100;
 
-    // Head forward check: nose Z vs shoulder Z
-    const nose = lm[0];
-    if (nose && nose.visibility > 0.5) {
-        res.headFwd = nearS.z - (nose.z || 0); // positive = nose more forward than shoulder
+    // Head forward check (nose X vs shoulder X in profile)
+    const nose = lm[KP.NOSE];
+    if (isProfile && nose && nose.score > 0.4 && nearS) {
+        res.headFwd = Math.abs(nose.x - nearS.x) * 100;
     }
 
     const warn = [];
 
     if (!isProfile) {
-        // ── FRONTAL analysis ──
-        // 1. Lateral spine tilt (screen angle)
-        if (Math.abs(screen) > 15) {
-            const dir = screen > 0 ? 'destra' : 'sinistra';
-            warn.push(`Schiena inclinata ${Math.round(Math.abs(screen))}° verso ${dir}`);
+        // ── FRONTAL ──
+        if (Math.abs(res.screenAngle) > 15) {
+            const dir = res.screenAngle > 0 ? 'destra' : 'sinistra';
+            warn.push(`Schiena inclinata ${Math.round(Math.abs(res.screenAngle))}° verso ${dir}`);
         }
-        // 2. Forward lean (3D depth angle)
-        if (depth < -20) {
-            warn.push(`Troppo in avanti — raddrizza il busto (${Math.round(Math.abs(depth))}°)`);
-        }
-        // 3. Shoulder height asymmetry
         if (res.shoulderAsym > 6) {
-            const low = l12.y > l11.y ? 'destra' : 'sinistra';
+            const low = rs.y > ls.y ? 'destra' : 'sinistra';
             warn.push(`Spalla ${low} più bassa — equilibra le spalle`);
         }
+        if (res.hipAsym > 5) {
+            const low = rh.y > lh.y ? 'destra' : 'sinistra';
+            warn.push(`Anca ${low} più bassa — controlla l'allineamento`);
+        }
     } else {
-        // ── PROFILE analysis ──
-        // Primary: screen angle = sagittal lean (forward/backward)
-        // In profile, a negative screen angle = leaning forward (toward camera left)
-        const fwdAngle = Math.abs(screen);
-        if (fwdAngle > 30) {
-            warn.push(`Schiena troppo inclinata in avanti — ${Math.round(fwdAngle)}° dalla verticale`);
-        } else if (fwdAngle > 18) {
-            warn.push(`Inclinazione in avanti — ${Math.round(fwdAngle)}° dalla verticale`);
+        // ── PROFILE ──
+        // screenAngle in profile = sagittal lean (forward/backward)
+        const fwd = Math.abs(res.screenAngle);
+        if (fwd > 30) {
+            warn.push(`Schiena troppo inclinata in avanti — ${Math.round(fwd)}° dalla verticale`);
+        } else if (fwd > 18) {
+            warn.push(`Inclinazione in avanti — ${Math.round(fwd)}° dalla verticale`);
         }
-
-        // Hip-knee-ankle chain angle (knee not too far forward)
-        const nearKnee   = viewMode === 'profile-left' ? lm[25] : lm[26];
-        const nearAnkle  = viewMode === 'profile-left' ? lm[27] : lm[28];
-        if (nearH && nearKnee && nearAnkle &&
-            nearKnee.visibility > 0.4 && nearAnkle.visibility > 0.4) {
-            const kneeAng = angleBetween(nearH, nearKnee, nearAnkle);
-            if (kneeAng !== null && kneeAng < 155) {
-                // Knee significantly bent — ok for squats but flag if unexpected
-                // Just show as info for now
-            }
-        }
-
-        // Head jutting forward: nose much more forward (in X) than shoulder
-        if (res.headFwd > 0.12) {
+        if (res.headFwd > 12) {
             warn.push('Testa in avanti — rientra il mento');
+        }
+        // Knee over ankle check
+        const nearKnee  = viewMode === 'profile-left' ? lm[KP.L_KNEE]  : lm[KP.R_KNEE];
+        const nearAnkle = viewMode === 'profile-left' ? lm[KP.L_ANKLE] : lm[KP.R_ANKLE];
+        if (nearH && nearKnee?.score > 0.4 && nearAnkle?.score > 0.4) {
+            const kneeAngle = angleBetween3pts(nearH, nearKnee, nearAnkle);
+            if (kneeAngle !== null && kneeAngle < 100) {
+                warn.push(`Ginocchio piegato ${Math.round(kneeAngle)}° — controlla la posizione`);
+            }
         }
     }
 
     res.warnings = warn;
     res.status   = warn.length === 0 ? 'good'
                  : warn.length === 1 ? 'warning' : 'bad';
-
     return res;
 }
 
 // ── Drawing ───────────────────────────────────────────────────────────────────
 
 function drawSkeleton(lm, W, H) {
-    if (!lm || lm.length === 0) return;
-
-    // Draw connections — visibility modulates opacity
+    // Connections
     for (const { a, b, col, w } of CONNECTIONS) {
         const la = lm[a], lb = lm[b];
         if (!la || !lb) continue;
-        const vis = Math.min(la.visibility, lb.visibility);
+        const vis = Math.min(la.score, lb.score);
         if (vis < 0.1) continue;
-
-        // Parse color and apply visibility alpha scaling
+        CTX.globalAlpha = Math.min(1, 0.35 + vis * 0.65);
         CTX.beginPath();
         CTX.moveTo(la.x * W, la.y * H);
         CTX.lineTo(lb.x * W, lb.y * H);
         CTX.strokeStyle = col;
-        CTX.lineWidth = (w || 2) * Math.min(1, 0.3 + vis * 0.7);
-        CTX.globalAlpha = Math.min(1, 0.4 + vis * 0.6);
+        CTX.lineWidth   = (w || 2) * Math.min(1, 0.4 + vis * 0.6);
         CTX.stroke();
     }
     CTX.globalAlpha = 1;
 
-    // Draw joints
+    // Joints
     for (let i = 0; i < lm.length; i++) {
         const p = lm[i];
-        if (!p || p.visibility < 0.15) continue;
+        if (!p || p.score < 0.15) continue;
+        const x   = p.x * W, y = p.y * H;
+        const col = JOINT_COL[i] || '#fff';
+        const key = KEY_JOINTS.has(i);
+        const r   = key ? 7 : 4;
 
-        const x = p.x * W, y = p.y * H;
-        const col   = JOINT_COL[i] || '#ffffff';
-        const isKey = [11,12,23,24].includes(i);
-        const r     = isKey ? 7 : 4;
+        CTX.globalAlpha = Math.min(1, 0.35 + p.score * 0.65);
 
-        CTX.globalAlpha = Math.min(1, 0.4 + p.visibility * 0.6);
-
-        if (isKey) {
+        if (key) {
             CTX.beginPath();
             CTX.arc(x, y, r + 4, 0, Math.PI * 2);
             CTX.strokeStyle = col + '44';
             CTX.lineWidth   = 2;
             CTX.stroke();
         }
-
         CTX.beginPath();
         CTX.arc(x, y, r, 0, Math.PI * 2);
         CTX.fillStyle = col;
         CTX.fill();
-
-        if (isKey) {
+        if (key) {
             CTX.beginPath();
-            CTX.arc(x, y, r * 0.36, 0, Math.PI * 2);
+            CTX.arc(x, y, r * 0.35, 0, Math.PI * 2);
             CTX.fillStyle = 'rgba(0,0,0,0.75)';
             CTX.fill();
         }
@@ -302,24 +271,19 @@ function drawSkeleton(lm, W, H) {
 }
 
 function drawSpineLine(lm, W, H, posture, viewMode) {
-    const l11 = lm[11], l12 = lm[12];
-    const l23 = lm[23], l24 = lm[24];
-    if (!l11 || !l12 || !l23 || !l24) return;
+    const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
+    const lh = lm[KP.L_HIP],     rh = lm[KP.R_HIP];
+    if (!ls || !rs || !lh || !rh) return;
 
     const isProfile = viewMode !== 'frontal';
+    const spineTop  = isProfile
+        ? (viewMode === 'profile-left' ? ls : rs)
+        : { x:(ls.x+rs.x)/2, y:(ls.y+rs.y)/2, score:(ls.score+rs.score)/2 };
+    const spineBot  = isProfile
+        ? (viewMode === 'profile-left' ? lh : rh)
+        : { x:(lh.x+rh.x)/2, y:(lh.y+rh.y)/2, score:(lh.score+rh.score)/2 };
 
-    // Use near-side shoulder/hip in profile, midpoints in frontal
-    const spineTop = isProfile
-        ? (viewMode === 'profile-left' ? l11 : l12)
-        : { x:(l11.x+l12.x)/2, y:(l11.y+l12.y)/2,
-            visibility:(l11.visibility+l12.visibility)/2 };
-    const spineBot = isProfile
-        ? (viewMode === 'profile-left' ? l23 : l24)
-        : { x:(l23.x+l24.x)/2, y:(l23.y+l24.y)/2,
-            visibility:(l23.visibility+l24.visibility)/2 };
-
-    const spineVis = Math.min(spineTop.visibility, spineBot.visibility);
-    if (spineVis < 0.2) return;
+    if (Math.min(spineTop.score, spineBot.score) < 0.2) return;
 
     const sX = spineTop.x * W, sY = spineTop.y * H;
     const hX = spineBot.x * W, hY = spineBot.y * H;
@@ -331,83 +295,80 @@ function drawSpineLine(lm, W, H, posture, viewMode) {
 
     // Glow
     CTX.beginPath(); CTX.moveTo(sX, sY); CTX.lineTo(hX, hY);
-    CTX.strokeStyle = col + '28'; CTX.lineWidth = 18; CTX.stroke();
+    CTX.strokeStyle = col + '25'; CTX.lineWidth = 20; CTX.stroke();
 
-    // Core dashed line
+    // Dashed spine line
     CTX.beginPath(); CTX.moveTo(sX, sY); CTX.lineTo(hX, hY);
     CTX.strokeStyle = col; CTX.lineWidth = 2.5;
     CTX.setLineDash([8, 5]); CTX.stroke(); CTX.setLineDash([]);
 
     // Endpoint dots
-    for (const [px, py] of [[sX, sY], [hX, hY]]) {
-        CTX.beginPath(); CTX.arc(px, py, 5, 0, Math.PI * 2);
+    for (const [px, py] of [[sX,sY],[hX,hY]]) {
+        CTX.beginPath(); CTX.arc(px, py, 5, 0, Math.PI*2);
         CTX.fillStyle = col; CTX.fill();
     }
 
-    // Angle arc at hip
     if (!posture.visible) return;
-    const arcR   = 40;
-    // Vertical reference
-    CTX.beginPath(); CTX.moveTo(hX, hY); CTX.lineTo(hX, hY - arcR - 12);
-    CTX.strokeStyle = 'rgba(255,255,255,0.28)'; CTX.lineWidth = 1.2;
-    CTX.setLineDash([4, 4]); CTX.stroke(); CTX.setLineDash([]);
 
-    // Arc sweeping from vertical to spine direction
+    // Vertical reference at hip
+    const arcR = 40;
+    CTX.beginPath(); CTX.moveTo(hX, hY); CTX.lineTo(hX, hY - arcR - 14);
+    CTX.strokeStyle = 'rgba(255,255,255,0.25)'; CTX.lineWidth = 1;
+    CTX.setLineDash([4,4]); CTX.stroke(); CTX.setLineDash([]);
+
+    // Angle arc
     const angleDeg = posture.screenAngle;
     const a0 = -Math.PI / 2;
-    const a1 = a0 + (angleDeg * Math.PI / 180);
+    const a1 = a0 + angleDeg * Math.PI / 180;
     CTX.beginPath();
-    CTX.arc(hX, hY, arcR, Math.min(a0, a1), Math.max(a0, a1));
-    CTX.strokeStyle = col; CTX.lineWidth = 2;
-    CTX.stroke();
+    CTX.arc(hX, hY, arcR, Math.min(a0,a1), Math.max(a0,a1));
+    CTX.strokeStyle = col; CTX.lineWidth = 2; CTX.stroke();
 
     // Angle label
-    const labelAngle = Math.round(Math.abs(angleDeg));
-    if (labelAngle > 1 && spineVis > 0.4) {
-        CTX.font = 'bold 11px IBM Plex Mono, monospace';
+    const deg = Math.round(Math.abs(angleDeg));
+    if (deg > 1 && spineTop.score > 0.4) {
+        CTX.font      = 'bold 11px IBM Plex Mono, monospace';
         CTX.fillStyle = col;
-        const lx = hX + (angleDeg >= 0 ? arcR + 6 : -(arcR + 30));
-        CTX.fillText(labelAngle + '°', lx, hY - 8);
+        CTX.fillText(deg + '°', hX + (angleDeg >= 0 ? arcR + 6 : -(arcR + 32)), hY - 8);
     }
 
-    // In profile: also draw vertical plumb line from top of head to show overall posture
-    if (isProfile && lm[0] && lm[0].visibility > 0.4) {
-        const nose = lm[0];
-        CTX.beginPath();
-        CTX.moveTo(nose.x * W, nose.y * H);
-        CTX.lineTo(hX, hY + 30);
-        CTX.strokeStyle = 'rgba(255,255,255,0.15)';
-        CTX.lineWidth = 1;
-        CTX.setLineDash([3, 6]);
-        CTX.stroke();
-        CTX.setLineDash([]);
+    // Profile: plumb line from nose to give full-body reference
+    if (isProfile) {
+        const nose = lm[KP.NOSE];
+        if (nose && nose.score > 0.4) {
+            CTX.beginPath();
+            CTX.moveTo(nose.x * W, nose.y * H);
+            CTX.lineTo(hX, hY + 20);
+            CTX.strokeStyle = 'rgba(255,255,255,0.13)';
+            CTX.lineWidth = 1;
+            CTX.setLineDash([3, 7]); CTX.stroke(); CTX.setLineDash([]);
+        }
     }
 }
 
-// ── UI Updates ────────────────────────────────────────────────────────────────
+// ── UI ────────────────────────────────────────────────────────────────────────
 
 function setMV(el, row, text, state) {
     el.textContent = text;
-    el.className = 'm-val ' + (state || '');
-    row.className = 'metric-row ' + (state === 'bad' ? 'warn' : state === 'warning' ? 'ok' : '');
+    el.className   = 'm-val ' + (state || '');
+    row.className  = 'metric-row ' + (state === 'bad' ? 'warn' : state === 'warning' ? 'ok' : '');
 }
 
 function updateUI(posture, viewMode, hasBody) {
     const isProfile = viewMode !== 'frontal';
 
-    // View badge
     viewBadge.textContent = isProfile ? 'PROFILO' : 'FRONTALE';
     viewBadge.className   = 'view-badge' + (isProfile ? ' profile' : '');
 
-    // Metric labels change based on view
+    // Update metric labels per view
     if (isProfile) {
         lblLat.textContent    = 'INCL. AVANTI';
         lblFwd.textContent    = 'TESTA AVANTI';
         lblSpalle.textContent = 'GINOCCHIO';
     } else {
         lblLat.textContent    = 'INCL. LAT.';
-        lblFwd.textContent    = 'LEAN AVANTI';
-        lblSpalle.textContent = 'SIM. SPALLE';
+        lblFwd.textContent    = 'ASIMM. SPALLE';
+        lblSpalle.textContent = 'ALIGN. ANCHE';
     }
 
     // Score
@@ -415,49 +376,39 @@ function updateUI(posture, viewMode, hasBody) {
     setMV(vScore, document.getElementById('m-score'), posture.score + '%', ss);
 
     if (!posture.visible || !hasBody) {
-        angleVal.textContent = '—°';
-        angleBadge.className = '';
-        setMV(vLat,    mLat,    '—', '');
-        setMV(vFwd,    mFwd,    '—', '');
+        angleVal.textContent = '—°'; angleBadge.className = '';
+        setMV(vLat, mLat, '—', ''); setMV(vFwd, mFwd, '—', '');
         setMV(vSpalle, mSpalle, '—', '');
         warningBanner.classList.add('hidden');
         goodBanner.classList.add('hidden');
         return;
     }
 
-    // Spine angle badge — shows the primary angle for current view
-    const mainAngle = Math.round(Math.abs(posture.screenAngle));
-    angleVal.textContent = mainAngle + '°';
-    const as = mainAngle < (isProfile ? 18 : 15) ? 'good'
-             : mainAngle < (isProfile ? 30 : 25) ? 'warning' : 'bad';
-    angleBadge.className = as;
+    // Primary angle badge
+    const mainAng = Math.round(Math.abs(posture.screenAngle));
+    angleVal.textContent = mainAng + '°';
+    const thr = isProfile ? [18, 30] : [15, 25];
+    angleBadge.className = mainAng < thr[0] ? 'good' : mainAng < thr[1] ? 'warning' : 'bad';
 
     if (!isProfile) {
-        // Frontal metrics
-        const latS = Math.abs(posture.screenAngle) < 15 ? 'good'
-                   : Math.abs(posture.screenAngle) < 25 ? 'warning' : 'bad';
-        setMV(vLat, mLat, Math.round(Math.abs(posture.screenAngle)) + '°', latS);
+        const ls = mainAng < 15 ? 'good' : mainAng < 25 ? 'warning' : 'bad';
+        setMV(vLat, mLat, mainAng + '°', ls);
 
-        const dA = Math.abs(posture.depthAngle);
-        const fwdS = dA < 20 ? 'good' : dA < 35 ? 'warning' : 'bad';
-        setMV(vFwd, mFwd, Math.round(dA) + '°', fwdS);
+        const as = posture.shoulderAsym < 6 ? 'good' : posture.shoulderAsym < 12 ? 'warning' : 'bad';
+        setMV(vFwd, mFwd, Math.round(posture.shoulderAsym) + '%', as);
 
-        const aS = posture.shoulderAsym < 6 ? 'good' : posture.shoulderAsym < 12 ? 'warning' : 'bad';
-        setMV(vSpalle, mSpalle, Math.round(posture.shoulderAsym) + '%', aS);
+        const hs = posture.hipAsym < 5 ? 'good' : posture.hipAsym < 10 ? 'warning' : 'bad';
+        setMV(vSpalle, mSpalle, Math.round(posture.hipAsym) + '%', hs);
     } else {
-        // Profile metrics
-        const fwdA = Math.abs(posture.screenAngle);
-        const fwdS = fwdA < 18 ? 'good' : fwdA < 30 ? 'warning' : 'bad';
-        setMV(vLat, mLat, Math.round(fwdA) + '°', fwdS);
+        const fs = mainAng < 18 ? 'good' : mainAng < 30 ? 'warning' : 'bad';
+        setMV(vLat, mLat, mainAng + '°', fs);
 
-        const hdF = Math.round(posture.headFwd * 100);
-        const hdS = hdF < 8 ? 'good' : hdF < 14 ? 'warning' : 'bad';
-        setMV(vFwd, mFwd, hdF + '%', hdS);
-
+        const hf = posture.headFwd;
+        const hfs = hf < 8 ? 'good' : hf < 14 ? 'warning' : 'bad';
+        setMV(vFwd, mFwd, Math.round(hf) + '%', hfs);
         setMV(vSpalle, mSpalle, '—', '');
     }
 
-    // Banners
     const { warnings, status } = posture;
     if (status === 'good') {
         warningBanner.classList.add('hidden');
@@ -470,67 +421,87 @@ function updateUI(posture, viewMode, hasBody) {
     }
 }
 
-// ── Main result handler ───────────────────────────────────────────────────────
+// ── Detect loop ───────────────────────────────────────────────────────────────
 
-function onPoseResults(results) {
+function onPoseResults(keypoints) {
     if (CANVAS.width  !== VIDEO.videoWidth)  CANVAS.width  = VIDEO.videoWidth  || 640;
     if (CANVAS.height !== VIDEO.videoHeight) CANVAS.height = VIDEO.videoHeight || 480;
-
     const W = CANVAS.width, H = CANVAS.height;
     CTX.clearRect(0, 0, W, H);
 
-    const lm      = results.poseLandmarks;
-    const hasBody = !!lm && lm.length > 0;
-    const viewMode = hasBody ? detectViewMode(lm) : _stableView;
-    const posture  = analyzePosture(lm || [], viewMode);
+    const hasBody = !!keypoints && keypoints.length > 0;
 
-    if (hasBody) {
+    // Normalize pixel coords → [0,1]
+    const lm = hasBody ? keypoints.map(kp => ({
+        x: kp.x / W, y: kp.y / H, score: kp.score ?? 0,
+    })) : null;
+
+    const viewMode = lm ? detectViewMode(lm) : _stableView;
+    const posture  = analyzePosture(lm ?? [], viewMode);
+
+    if (lm) {
         drawSkeleton(lm, W, H);
         drawSpineLine(lm, W, H, posture, viewMode);
     }
 
-    // Status pill
     statusDot.className    = hasBody ? 'sdot active' : 'sdot warning';
     statusText.textContent = hasBody ? 'TRACCIAMENTO ATTIVO' : 'RICERCA CORPO...';
-
     updateUI(posture, viewMode, hasBody);
 }
 
-// ── MediaPipe setup ───────────────────────────────────────────────────────────
+let detector = null;
+let looping  = false;
 
-const pose = new Pose({
-    locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-});
+async function loop() {
+    if (!looping) return;
+    if (detector && VIDEO.readyState >= 2) {
+        try {
+            const poses = await detector.estimatePoses(VIDEO, { flipHorizontal: false });
+            onPoseResults(poses[0]?.keypoints ?? null);
+        } catch (_) { /* skip bad frame */ }
+    }
+    requestAnimationFrame(loop);
+}
 
-pose.setOptions({
-    modelComplexity:         0,     // LITE model — fastest, ~30fps on modern hardware
-    smoothLandmarks:         true,  // temporal smoothing built-in
-    enableSegmentation:      false,
-    smoothSegmentation:      false,
-    minDetectionConfidence:  0.4,   // lower → better profile detection
-    minTrackingConfidence:   0.4,
-});
+// ── Init ──────────────────────────────────────────────────────────────────────
 
-pose.onResults(onPoseResults);
+async function init() {
+    try {
+        await tf.ready();
+        await tf.setBackend('webgl');
 
-// ── Camera ────────────────────────────────────────────────────────────────────
+        loadingOv.querySelector('.loader-text').textContent = 'CARICAMENTO MOVENET THUNDER...';
 
-const camera = new Camera(VIDEO, {
-    onFrame: async () => { await pose.send({ image: VIDEO }); },
-    width:  640,
-    height: 480,
-});
+        detector = await poseDetection.createDetector(
+            poseDetection.SupportedModels.MoveNet,
+            {
+                modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER,
+                enableSmoothing: true,  // built-in temporal smoothing
+            }
+        );
 
-camera.start()
-    .then(() => {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480, facingMode: 'user' },
+            audio: false,
+        });
+        VIDEO.srcObject = stream;
+        await new Promise(r => { VIDEO.onloadedmetadata = r; });
+        VIDEO.play();
+
         statusDot.className    = 'sdot active';
         statusText.textContent = 'FOTOCAMERA ATTIVA';
         loadingOv.classList.add('hidden');
-    })
-    .catch(err => {
+        looping = true;
+        loop();
+    } catch (err) {
         statusDot.className    = 'sdot error';
-        statusText.textContent = 'ERRORE FOTOCAMERA';
+        statusText.textContent = 'ERRORE';
         loadingOv.querySelector('.loader-text').textContent =
-            'ACCESSO NEGATO — controlla i permessi';
+            err.name === 'NotAllowedError'
+                ? 'ACCESSO FOTOCAMERA NEGATO'
+                : `ERRORE: ${err.message}`;
         console.error(err);
-    });
+    }
+}
+
+init();

@@ -46,12 +46,12 @@
             </div>
             <div class="metric-row" id="m-fwd">
                 <span class="m-icon">↗</span>
-                <span class="m-label">LEAN AVANTI</span>
+                <span class="m-label" id="lbl-fwd">ASIMM. SPALLE</span>
                 <span class="m-val" id="v-fwd">—</span>
             </div>
             <div class="metric-row" id="m-spalle">
                 <span class="m-icon">⇌</span>
-                <span class="m-label">SIM. SPALLE</span>
+                <span class="m-label" id="lbl-spalle">ALIGN. ANCHE</span>
                 <span class="m-val" id="v-spalle">—</span>
             </div>
             <div class="metric-row" id="m-score">
@@ -71,8 +71,8 @@
 
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
