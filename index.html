@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKELETON — Analisi Posturale</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <div class="loader-content">
+            <div class="loader-ring"></div>
+            <p class="loader-text">INIZIALIZZAZIONE MODELLO...</p>
+        </div>
+    </div>
+
+    <header>
+        <div class="brand">
+            <span class="brand-icon">◈</span>
+            <span class="brand-name">SKELETON</span>
+        </div>
+        <div class="status-bar">
+            <span id="status-dot" class="status-dot"></span>
+            <span id="status-text">IN ATTESA</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="viewport-container">
+            <video id="video" playsinline></video>
+            <canvas id="canvas"></canvas>
+
+            <div class="hud-overlay">
+
+                <!-- Score panel -->
+                <div class="score-panel">
+                    <svg class="score-ring" viewBox="0 0 120 120">
+                        <circle class="ring-bg" cx="60" cy="60" r="50"/>
+                        <circle id="ring-progress" class="ring-progress" cx="60" cy="60" r="50"/>
+                    </svg>
+                    <div class="score-inner">
+                        <span id="score-value">—</span>
+                        <span class="score-label">QUALITÀ</span>
+                    </div>
+                </div>
+
+                <!-- Landmarks panel -->
+                <div class="landmarks-panel">
+                    <div class="panel-title">PUNTI SCHIENA</div>
+                    <div class="landmark-row" id="lm-spalla-sx">
+                        <span class="lm-dot"></span>
+                        <span class="lm-name">SPALLA SX</span>
+                        <span class="lm-val">—</span>
+                    </div>
+                    <div class="landmark-row" id="lm-spalla-dx">
+                        <span class="lm-dot"></span>
+                        <span class="lm-name">SPALLA DX</span>
+                        <span class="lm-val">—</span>
+                    </div>
+                    <div class="landmark-row" id="lm-anca-sx">
+                        <span class="lm-dot"></span>
+                        <span class="lm-name">ANCA SX</span>
+                        <span class="lm-val">—</span>
+                    </div>
+                    <div class="landmark-row" id="lm-anca-dx">
+                        <span class="lm-dot"></span>
+                        <span class="lm-name">ANCA DX</span>
+                        <span class="lm-val">—</span>
+                    </div>
+                    <div class="landmark-row" id="lm-colonna">
+                        <span class="lm-dot"></span>
+                        <span class="lm-name">COLONNA</span>
+                        <span class="lm-val">—</span>
+                    </div>
+                </div>
+
+                <!-- Feedback banner -->
+                <div id="feedback-banner" class="feedback-banner">
+                    <span id="feedback-text">Posizionati davanti alla fotocamera</span>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+    
