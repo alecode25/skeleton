@@ -227,7 +227,7 @@ function drawSkeleton(lm, W, H) {
         const la = lm[a], lb = lm[b];
         if (!la || !lb) continue;
         const vis = Math.min(la.score, lb.score);
-        if (vis < 0.1) continue;
+        if (vis < 0.08) continue;
         CTX.globalAlpha = Math.min(1, 0.35 + vis * 0.65);
         CTX.beginPath();
         CTX.moveTo(la.x * W, la.y * H);
@@ -241,7 +241,7 @@ function drawSkeleton(lm, W, H) {
     // Joints
     for (let i = 0; i < lm.length; i++) {
         const p = lm[i];
-        if (!p || p.score < 0.15) continue;
+        if (!p || p.score < 0.08) continue;
         const x   = p.x * W, y = p.y * H;
         const col = JOINT_COL[i] || '#fff';
         const key = KEY_JOINTS.has(i);
@@ -431,9 +431,11 @@ function onPoseResults(keypoints) {
 
     const hasBody = !!keypoints && keypoints.length > 0;
 
-    // Normalize pixel coords → [0,1]
+    // Normalize pixel coords → [0,1]  (MoveNet returns absolute pixels)
+    const vW = VIDEO.videoWidth  || W;
+    const vH = VIDEO.videoHeight || H;
     const lm = hasBody ? keypoints.map(kp => ({
-        x: kp.x / W, y: kp.y / H, score: kp.score ?? 0,
+        x: kp.x / vW, y: kp.y / vH, score: kp.score ?? 0,
     })) : null;
 
     const viewMode = lm ? detectViewMode(lm) : _stableView;
@@ -475,8 +477,9 @@ async function init() {
         detector = await poseDetection.createDetector(
             poseDetection.SupportedModels.MoveNet,
             {
-                modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER,
-                enableSmoothing: true,  // built-in temporal smoothing
+                modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+                enableSmoothing: true,
+                minPoseScore: 0.15,
             }
         );
 
