@@ -126,6 +126,55 @@ const EXERCISES = {
 let activeExercise = 'inpiedi';
 let repState = { count: 0, phase: 'up' };
 
+// ── Keypoint smoothing (EMA) ──────────────────────────────────────────────────
+// Higher SMOOTH_ALPHA = more stable but more lag; 0.55 is a good balance
+const SMOOTH_ALPHA  = 0.55;
+const SCORE_ALPHA   = 0.40;  // score smoothed less aggressively
+let   smoothedKps   = null;
+let   missingFrames = 0;
+const MAX_MISSING   = 10;    // hold last pose ~330ms before clearing
+
+function smoothKeypoints(raw) {
+    if (!raw) return null;
+    if (!smoothedKps || smoothedKps.length !== raw.length) {
+        smoothedKps = raw.map(kp => ({ ...kp }));
+        return smoothedKps;
+    }
+    for (let i = 0; i < raw.length; i++) {
+        const r = raw[i], s = smoothedKps[i];
+        if (r.score > 0.15) {
+            s.x = SMOOTH_ALPHA * s.x + (1 - SMOOTH_ALPHA) * r.x;
+            s.y = SMOOTH_ALPHA * s.y + (1 - SMOOTH_ALPHA) * r.y;
+        }
+        s.score = SCORE_ALPHA * s.score + (1 - SCORE_ALPHA) * r.score;
+    }
+    return smoothedKps;
+}
+
+// ── Person validator ──────────────────────────────────────────────────────────
+// Rejects objects/ghosts: needs enough confident keypoints + plausible torso
+function isValidPerson(kps) {
+    if (!kps || kps.length < 17) return false;
+
+    // Need at least 5 keypoints above confidence threshold
+    const highConf = kps.filter(kp => kp.score > 0.30).length;
+    if (highConf < 5) return false;
+
+    const ls = kps[KP.L_SHOULDER], rs = kps[KP.R_SHOULDER];
+    const lh = kps[KP.L_HIP],     rh = kps[KP.R_HIP];
+
+    // At least one shoulder must be confident
+    if (ls.score < 0.25 && rs.score < 0.25) return false;
+
+    // Torso height: mid-shoulders to mid-hips must occupy ≥7% of frame height
+    const syMid  = (ls.y + rs.y) / 2;
+    const hyMid  = (lh.y + rh.y) / 2;
+    const torsoH = Math.abs(syMid - hyMid);
+    if (torsoH < 0.07) return false;
+
+    return true;
+}
+
 // ── Speech synthesis ──────────────────────────────────────────────────────────
 const synth       = window.speechSynthesis;
 let voiceEnabled  = true;
@@ -187,6 +236,41 @@ function detectViewMode(lm) {
     return _stableView;
 }
 
+// ── Metric smoothing + status hysteresis ─────────────────────────────────────
+// Second smoothing layer: on COMPUTED values (angles/asymmetries).
+// Keypoint EMA removes position jitter; this removes threshold-crossing flicker.
+const METRIC_ALPHA  = 0.62;   // 0=raw, 1=frozen. 0.62 ≈ 3-frame lag
+const STATUS_WINDOW = 12;     // frames in voting window for status stability
+const _sm = {};               // metric smooth state
+let   _statusHist = [];       // recent raw status strings
+
+// Smooth any named numeric metric
+function smv(key, val) {
+    if (val === null || val === undefined) return val;
+    _sm[key] = (key in _sm)
+        ? METRIC_ALPHA * _sm[key] + (1 - METRIC_ALPHA) * val
+        : val;
+    return _sm[key];
+}
+
+// Majority-vote over last STATUS_WINDOW frames.
+// Requires 60% agreement for bad/good, otherwise stays warning.
+function stableStatus(raw) {
+    _statusHist.push(raw);
+    if (_statusHist.length > STATUS_WINDOW) _statusHist.shift();
+    const n    = _statusHist.length;
+    const bad  = _statusHist.filter(s => s === 'bad').length;
+    const good = _statusHist.filter(s => s === 'good').length;
+    if (bad  / n >= 0.60) return 'bad';
+    if (good / n >= 0.60) return 'good';
+    return 'warning';
+}
+
+function resetSmoothState() {
+    for (const k in _sm) delete _sm[k];
+    _statusHist = [];
+}
+
 // ── Angles ────────────────────────────────────────────────────────────────────
 
 function computeScreenAngle(lm) {
@@ -240,14 +324,14 @@ function analyzePosture(lm, viewMode) {
     if (minVis < 0.2) return res;
 
     res.visible      = true;
-    res.screenAngle  = computeScreenAngle(lm);
-    res.shoulderAsym = Math.abs(ls.y - rs.y) * 100;
-    res.hipAsym      = Math.abs(lh.y - rh.y) * 100;
+    res.screenAngle  = smv('screenAngle',  computeScreenAngle(lm));
+    res.shoulderAsym = smv('shoulderAsym', Math.abs(ls.y - rs.y) * 100);
+    res.hipAsym      = smv('hipAsym',      Math.abs(lh.y - rh.y) * 100);
 
     // Head forward check (nose X vs shoulder X in profile)
     const nose = lm[KP.NOSE];
     if (isProfile && nose && nose.score > 0.4 && nearS) {
-        res.headFwd = Math.abs(nose.x - nearS.x) * 100;
+        res.headFwd = smv('headFwd', Math.abs(nose.x - nearS.x) * 100);
     }
 
     const ex   = EXERCISES[activeExercise];
@@ -302,7 +386,7 @@ function analyzePosture(lm, viewMode) {
         if (nearH && nearKnee?.score > 0.4 && nearAnkle?.score > 0.4) {
             const ka = angleBetween3pts(nearH, nearKnee, nearAnkle);
             if (ka !== null) {
-                res.kneeAngle = ka;
+                res.kneeAngle = smv('kneeAngle', ka);
                 if (pr.kneeMode === 'lt' && ka < pr.kneeThr) {
                     warn.push(`Ginocchio piegato ${Math.round(ka)}° — controlla la posizione`);
                 } else if (pr.kneeMode === 'gt' && ka > pr.kneeThr) {
@@ -313,7 +397,7 @@ function analyzePosture(lm, viewMode) {
 
         // ── Hip depth (squat only): positive = hip below knee ──
         if (activeExercise === 'squat' && nearH && nearKnee?.score > 0.3) {
-            res.hipDepth = nearH.y - nearKnee.y;
+            res.hipDepth = smv('hipDepth', nearH.y - nearKnee.y);
         }
 
         // ── Elbow angle (push-up only) ──
@@ -322,7 +406,7 @@ function analyzePosture(lm, viewMode) {
             const nearWrist = viewMode === 'profile-left' ? lm[KP.L_WRIST] : lm[KP.R_WRIST];
             if (nearS && nearElbow?.score > 0.3 && nearWrist?.score > 0.3) {
                 const ea = angleBetween3pts(nearS, nearElbow, nearWrist);
-                if (ea !== null) res.elbowAngle = ea;
+                if (ea !== null) res.elbowAngle = smv('elbowAngle', ea);
             }
         }
 
@@ -339,8 +423,8 @@ function analyzePosture(lm, viewMode) {
     }
 
     res.warnings = warn;
-    res.status   = warn.length === 0 ? 'good'
-                 : warn.length === 1 ? 'warning' : 'bad';
+    const rawStatus = warn.length === 0 ? 'good' : warn.length === 1 ? 'warning' : 'bad';
+    res.status = stableStatus(rawStatus);
     return res;
 }
 
@@ -643,19 +727,33 @@ function onPoseResults(keypoints) {
     const W = CANVAS.width, H = CANVAS.height;
     CTX.clearRect(0, 0, W, H);
 
-    const hasBody = !!keypoints && keypoints.length > 0;
-
-    // Normalize pixel coords → [0,1]  (MoveNet returns absolute pixels)
     const vW = VIDEO.videoWidth  || W;
     const vH = VIDEO.videoHeight || H;
-    const lm = hasBody ? keypoints.map(kp => ({
-        x: kp.x / vW, y: kp.y / vH, score: kp.score ?? 0,
-    })) : null;
+
+    // Normalize pixel coords → [0,1]
+    const rawKps = (keypoints && keypoints.length > 0)
+        ? keypoints.map(kp => ({ x: kp.x / vW, y: kp.y / vH, score: kp.score ?? 0 }))
+        : null;
+
+    // Validate: reject objects, shadows, partial scenes
+    const validDetection = rawKps && isValidPerson(rawKps);
+
+    if (validDetection) {
+        missingFrames = 0;
+        smoothKeypoints(rawKps);      // update EMA buffer
+    } else {
+        missingFrames++;
+        if (missingFrames > MAX_MISSING) smoothedKps = null;   // expire
+    }
+
+    // Use smoothed buffer — stays valid for MAX_MISSING frames after last good frame
+    const lm      = (smoothedKps && missingFrames <= MAX_MISSING) ? smoothedKps : null;
+    const hasBody = !!lm;
 
     const viewMode = lm ? detectViewMode(lm) : _stableView;
     const posture  = analyzePosture(lm ?? [], viewMode);
 
-    if (lm) {
+    if (hasBody) {
         drawSkeleton(lm, W, H);
         drawSpineLine(lm, W, H, posture, viewMode);
     }
@@ -691,14 +789,14 @@ async function init() {
         detector = await poseDetection.createDetector(
             poseDetection.SupportedModels.MoveNet,
             {
-                modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-                enableSmoothing: true,
-                minPoseScore: 0.15,
+                modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER,
+                enableSmoothing: false,   // we apply our own EMA — disable library smoothing
+                minPoseScore: 0.30,       // reject low-confidence non-person detections
             }
         );
 
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 640, height: 480, facingMode: 'user' },
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
             audio: false,
         });
         VIDEO.srcObject = stream;
@@ -729,6 +827,9 @@ document.querySelectorAll('.ex-card').forEach(btn => {
         lastRepCount  = 0;
         lastStatus    = 'unknown';
         lastSpokenTxt = '';
+        smoothedKps   = null;
+        missingFrames = 0;
+        resetSmoothState();
         synth.cancel();
         if (exerciseBadge) {
             exerciseBadge.textContent = EXERCISES[activeExercise].name;
