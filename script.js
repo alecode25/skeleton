@@ -13,6 +13,12 @@ const warningText   = document.getElementById('warning-text');
 const goodBanner    = document.getElementById('good-banner');
 
 const exerciseBadge = document.getElementById('exercise-badge');
+const repBadge      = document.getElementById('rep-badge');
+const repCountEl    = document.getElementById('rep-count-val');
+const badgeLbl      = document.getElementById('badge-lbl');
+const voiceBtn      = document.getElementById('voice-btn');
+
+const vfCorners = document.querySelector('.vf-corners');
 
 const vLat    = document.getElementById('v-lat');
 const vFwd    = document.getElementById('v-fwd');
@@ -91,30 +97,68 @@ const CONNECTIONS = [
 // fr = frontal rules, pr = profile rules
 // kneeMode: 'lt' = warn if angle < kneeThr (bent when shouldn't), 'gt' = warn if > kneeThr (not bent enough)
 const EXERCISES = {
-    postura: {
-        name: 'POSTURA ERETTA',
-        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
-        pr: { fwdW:18, fwdB:30, headW:8, headB:14, kneeMode:'lt', kneeThr:100 },
+    // Standing upright — strictest alignment check
+    inpiedi: {
+        name: 'IN PIEDI',
+        fr: { spineW:10, spineB:18, shW:5, shB:10, hipW:4, hipB:8 },
+        pr: { fwdW:15, fwdB:25, headW:8, headB:14, kneeMode:'none' },
     },
+    // Seated at desk — more forward lean allowed
+    seduto: {
+        name: 'SEDUTO',
+        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
+        pr: { fwdW:25, fwdB:40, headW:10, headB:18, kneeMode:'none' },
+    },
+    // Squat — profile, check knee bends enough
     squat: {
         name: 'SQUAT',
-        fr: { spineW:15, spineB:25, shW:8, shB:16, hipW:8, hipB:16 },
-        pr: { fwdW:45, fwdB:65, headW:20, headB:30, kneeMode:'gt', kneeThr:140 },
+        fr: { spineW:15, spineB:28, shW:8, shB:16, hipW:8, hipB:16 },
+        pr: { fwdW:40, fwdB:60, headW:18, headB:28, kneeMode:'gt', kneeThr:130 },
     },
-    stacco: {
-        name: 'STACCO',
+    // Push-up — profile, body must stay horizontal
+    pushup: {
+        name: 'PUSH-UP',
         fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
-        pr: { fwdW:30, fwdB:50, headW:15, headB:22, kneeMode:'none' },
-    },
-    plank: {
-        name: 'PLANK',
-        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
-        // horizontal=true: good when |angle| 65-105°, warn outside, bad < 50° or > 115°
         pr: { horizontal:true, angLowB:50, angLowW:65, angHighW:105, angHighB:115, headW:25, headB:35, kneeMode:'none' },
     },
 };
 
-let activeExercise = 'postura';
+let activeExercise = 'inpiedi';
+let repState = { count: 0, phase: 'up' };
+
+// ── Speech synthesis ──────────────────────────────────────────────────────────
+const synth       = window.speechSynthesis;
+let voiceEnabled  = true;
+let lastSpokenTxt = '';
+let lastSpokenAt  = 0;
+let lastStatus    = 'unknown';
+let lastRepCount  = 0;
+
+function speak(text, force = false) {
+    if (!voiceEnabled || !synth) return;
+    const now = Date.now();
+    if (!force && text === lastSpokenTxt && now - lastSpokenAt < 7000) return;
+    if (!force && now - lastSpokenAt < 3500) return;
+    synth.cancel();
+    const utt    = new SpeechSynthesisUtterance(text);
+    utt.lang     = 'it-IT';
+    utt.rate     = 0.92;
+    utt.volume   = 1;
+    // prefer Italian voice if available
+    const voices = synth.getVoices();
+    const itVoice = voices.find(v => v.lang.startsWith('it'));
+    if (itVoice) utt.voice = itVoice;
+    synth.speak(utt);
+    lastSpokenTxt = text;
+    lastSpokenAt  = now;
+}
+
+voiceBtn.addEventListener('click', () => {
+    voiceEnabled = !voiceEnabled;
+    voiceBtn.textContent = voiceEnabled ? '🔊' : '🔇';
+    voiceBtn.classList.toggle('muted', !voiceEnabled);
+    if (!voiceEnabled) synth.cancel();
+});
 
 // ── View mode detection ───────────────────────────────────────────────────────
 
@@ -174,7 +218,8 @@ function analyzePosture(lm, viewMode) {
     const res = {
         visible: false, viewMode,
         screenAngle: 0,
-        shoulderAsym: 0, hipAsym: 0, headFwd: 0, kneeAngle: null,
+        shoulderAsym: 0, hipAsym: 0, headFwd: 0,
+        kneeAngle: null, elbowAngle: null, hipDepth: null, phase: null,
         score: 0, warnings: [], status: 'unknown',
     };
 
@@ -265,6 +310,32 @@ function analyzePosture(lm, viewMode) {
                 }
             }
         }
+
+        // ── Hip depth (squat only): positive = hip below knee ──
+        if (activeExercise === 'squat' && nearH && nearKnee?.score > 0.3) {
+            res.hipDepth = nearH.y - nearKnee.y;
+        }
+
+        // ── Elbow angle (push-up only) ──
+        if (activeExercise === 'pushup') {
+            const nearElbow = viewMode === 'profile-left' ? lm[KP.L_ELBOW] : lm[KP.R_ELBOW];
+            const nearWrist = viewMode === 'profile-left' ? lm[KP.L_WRIST] : lm[KP.R_WRIST];
+            if (nearS && nearElbow?.score > 0.3 && nearWrist?.score > 0.3) {
+                const ea = angleBetween3pts(nearS, nearElbow, nearWrist);
+                if (ea !== null) res.elbowAngle = ea;
+            }
+        }
+
+        // ── Rep counting ──
+        if (activeExercise === 'squat' && res.kneeAngle !== null) {
+            if (repState.phase === 'up'   && res.kneeAngle < 105) repState.phase = 'down';
+            else if (repState.phase === 'down' && res.kneeAngle > 155) { repState.phase = 'up'; repState.count++; }
+        }
+        if (activeExercise === 'pushup' && res.elbowAngle !== null) {
+            if (repState.phase === 'up'   && res.elbowAngle < 100) repState.phase = 'down';
+            else if (repState.phase === 'down' && res.elbowAngle > 155) { repState.phase = 'up'; repState.count++; }
+        }
+        res.phase = repState.phase;
     }
 
     res.warnings = warn;
@@ -417,13 +488,15 @@ function updateUI(posture, viewMode, hasBody) {
     // Update metric labels per view / exercise
     const ex = EXERCISES[activeExercise];
     if (isProfile) {
-        lblLat.textContent    = ex.pr.horizontal ? 'PIANO' : 'INCL. AVANTI';
-        lblFwd.textContent    = 'TESTA AVANTI';
-        lblSpalle.textContent = (activeExercise === 'postura' || activeExercise === 'squat') ? 'GINOCCHIO' : '—';
+        if (activeExercise === 'squat') {
+            lblLat.textContent = 'SCHIENA'; lblFwd.textContent = 'GINOCCHIO'; lblSpalle.textContent = 'PROFONDITÀ';
+        } else if (activeExercise === 'pushup') {
+            lblLat.textContent = 'PIANO CORPO'; lblFwd.textContent = 'GOMITO'; lblSpalle.textContent = '—';
+        } else {
+            lblLat.textContent = 'INCL. AVANTI'; lblFwd.textContent = 'TESTA AVANTI'; lblSpalle.textContent = '—';
+        }
     } else {
-        lblLat.textContent    = 'INCL. LAT.';
-        lblFwd.textContent    = 'ASIMM. SPALLE';
-        lblSpalle.textContent = 'ALIGN. ANCHE';
+        lblLat.textContent = 'INCL. LAT.'; lblFwd.textContent = 'ASIMM. SPALLE'; lblSpalle.textContent = 'ALIGN. ANCHE';
     }
 
     // Score
@@ -436,7 +509,29 @@ function updateUI(posture, viewMode, hasBody) {
         setMV(vSpalle, mSpalle, '—', '');
         warningBanner.classList.add('hidden');
         goodBanner.classList.add('hidden');
+        repBadge.classList.add('hidden');
+        if (vfCorners) { vfCorners.classList.remove('good','bad'); }
         return;
+    }
+
+    // Esercizi laterali: invita a girarsi di profilo se vista frontale
+    if (activeExercise !== 'inpiedi' && !isProfile) {
+        angleVal.textContent = '—°'; angleBadge.className = '';
+        setMV(vLat, mLat, '—', ''); setMV(vFwd, mFwd, '—', '');
+        setMV(vSpalle, mSpalle, '—', '');
+        warningText.textContent = '⚠ GIRATI DI PROFILO';
+        warningBanner.classList.remove('hidden');
+        goodBanner.classList.add('hidden');
+        repBadge.classList.add('hidden');
+        return;
+    }
+
+    // Rep counter badge
+    if (activeExercise === 'squat' || activeExercise === 'pushup') {
+        repBadge.classList.remove('hidden');
+        repCountEl.textContent = repState.count;
+    } else {
+        repBadge.classList.add('hidden');
     }
 
     // Primary angle badge
@@ -444,65 +539,99 @@ function updateUI(posture, viewMode, hasBody) {
     const { pr, fr } = ex;
 
     if (isProfile && pr.horizontal) {
-        // Plank: show deviation from horizontal (0° = perfect)
         const devH = Math.round(Math.abs(90 - mainAng));
         angleVal.textContent = devH + '°';
+        badgeLbl.textContent = 'PIANO';
         const a = mainAng;
         angleBadge.className = (a >= pr.angLowW && a <= pr.angHighW) ? 'good'
                              : (a <  pr.angLowB  || a >  pr.angHighB) ? 'bad' : 'warning';
     } else {
         angleVal.textContent = mainAng + '°';
+        badgeLbl.textContent = activeExercise === 'squat' ? 'SCHIENA' : 'COLONNA';
         const thr = isProfile ? [pr.fwdW, pr.fwdB] : [fr.spineW, fr.spineB];
         angleBadge.className = mainAng < thr[0] ? 'good' : mainAng < thr[1] ? 'warning' : 'bad';
     }
 
     if (!isProfile) {
-        const ls = mainAng < fr.spineW ? 'good' : mainAng < fr.spineB ? 'warning' : 'bad';
-        setMV(vLat, mLat, mainAng + '°', ls);
+        // ── Frontale ──
+        setMV(vLat, mLat, mainAng + '°',
+            mainAng < fr.spineW ? 'good' : mainAng < fr.spineB ? 'warning' : 'bad');
+        setMV(vFwd, mFwd, Math.round(posture.shoulderAsym) + '%',
+            posture.shoulderAsym < fr.shW ? 'good' : posture.shoulderAsym < fr.shB ? 'warning' : 'bad');
+        setMV(vSpalle, mSpalle, Math.round(posture.hipAsym) + '%',
+            posture.hipAsym < fr.hipW ? 'good' : posture.hipAsym < fr.hipB ? 'warning' : 'bad');
 
-        const as = posture.shoulderAsym < fr.shW ? 'good' : posture.shoulderAsym < fr.shB ? 'warning' : 'bad';
-        setMV(vFwd, mFwd, Math.round(posture.shoulderAsym) + '%', as);
+    } else if (activeExercise === 'squat') {
+        // ── Squat: schiena / ginocchio / profondità ──
+        setMV(vLat, mLat, mainAng + '°',
+            mainAng < pr.fwdW ? 'good' : mainAng < pr.fwdB ? 'warning' : 'bad');
 
-        const hs = posture.hipAsym < fr.hipW ? 'good' : posture.hipAsym < fr.hipB ? 'warning' : 'bad';
-        setMV(vSpalle, mSpalle, Math.round(posture.hipAsym) + '%', hs);
-    } else if (pr.horizontal) {
-        // Plank profile
-        const devH = Math.round(Math.abs(90 - mainAng));
-        const a  = mainAng;
-        const ps = (a >= pr.angLowW && a <= pr.angHighW) ? 'good'
-                 : (a <  pr.angLowB  || a >  pr.angHighB) ? 'bad' : 'warning';
-        setMV(vLat, mLat, devH + '°', ps);
-
-        const hf = posture.headFwd;
-        setMV(vFwd, mFwd, Math.round(hf) + '%', hf < pr.headW ? 'good' : hf < pr.headB ? 'warning' : 'bad');
-        setMV(vSpalle, mSpalle, '—', '');
-    } else {
-        const fs = mainAng < pr.fwdW ? 'good' : mainAng < pr.fwdB ? 'warning' : 'bad';
-        setMV(vLat, mLat, mainAng + '°', fs);
-
-        const hf = posture.headFwd;
-        setMV(vFwd, mFwd, Math.round(hf) + '%', hf < pr.headW ? 'good' : hf < pr.headB ? 'warning' : 'bad');
-
-        if (posture.kneeAngle !== null && pr.kneeMode !== 'none') {
+        if (posture.kneeAngle !== null) {
             const ka = posture.kneeAngle;
-            const ks = pr.kneeMode === 'lt'
-                ? (ka >= pr.kneeThr ? 'good' : ka >= pr.kneeThr - 25 ? 'warning' : 'bad')
-                : (ka <= pr.kneeThr - 30 ? 'good' : ka <= pr.kneeThr ? 'warning' : 'bad');
-            setMV(vSpalle, mSpalle, Math.round(ka) + '°', ks);
-        } else {
-            setMV(vSpalle, mSpalle, '—', '');
-        }
+            setMV(vFwd, mFwd, Math.round(ka) + '°',
+                ka < 100 ? 'good' : ka < pr.kneeThr ? 'warning' : 'bad');
+        } else { setMV(vFwd, mFwd, '—', ''); }
+
+        if (posture.hipDepth !== null) {
+            const d = posture.hipDepth;
+            setMV(vSpalle, mSpalle,
+                d > 0.04 ? 'PROFONDA' : d > -0.04 ? 'OK' : 'POCO',
+                d > 0.04 ? 'good'     : d > -0.04 ? 'warning' : 'bad');
+        } else { setMV(vSpalle, mSpalle, '—', ''); }
+
+    } else if (activeExercise === 'pushup') {
+        // ── Push-up: piano corpo / gomito ──
+        const devH = Math.round(Math.abs(90 - mainAng));
+        const a = mainAng;
+        setMV(vLat, mLat, devH + '°',
+            (a >= pr.angLowW && a <= pr.angHighW) ? 'good'
+            : (a < pr.angLowB || a > pr.angHighB) ? 'bad' : 'warning');
+
+        if (posture.elbowAngle !== null) {
+            const ea = posture.elbowAngle;
+            // In basso (gomito chiuso) = buono; in alto (dritto) = top position
+            setMV(vFwd, mFwd, Math.round(ea) + '°',
+                ea < 100 ? 'good' : ea < 140 ? 'warning' : 'bad');
+        } else { setMV(vFwd, mFwd, '—', ''); }
+
+        setMV(vSpalle, mSpalle, '—', '');
+
+    } else {
+        // ── Seduto / In Piedi profilo ──
+        setMV(vLat, mLat, mainAng + '°',
+            mainAng < pr.fwdW ? 'good' : mainAng < pr.fwdB ? 'warning' : 'bad');
+        const hf = posture.headFwd;
+        setMV(vFwd, mFwd, Math.round(hf) + '%',
+            hf < pr.headW ? 'good' : hf < pr.headB ? 'warning' : 'bad');
+        setMV(vSpalle, mSpalle, '—', '');
     }
 
     const { warnings, status } = posture;
+    if (vfCorners) { vfCorners.classList.toggle('good', status === 'good'); vfCorners.classList.toggle('bad', status === 'bad'); }
     if (status === 'good') {
         warningBanner.classList.add('hidden');
         goodBanner.classList.remove('hidden');
+        if (activeExercise === 'squat' && posture.hipDepth !== null) {
+            goodBanner.textContent = posture.hipDepth > 0.04 ? '✓ BUONA PROFONDITÀ' : '✓ SCENDI DI PIÙ';
+        } else if (activeExercise === 'pushup') {
+            goodBanner.textContent = posture.phase === 'down' ? '✓ OTTIMA PROFONDITÀ' : '✓ FORMA CORRETTA';
+        } else {
+            goodBanner.textContent = '✓ POSTURA CORRETTA';
+        }
     } else {
         goodBanner.classList.add('hidden');
         const wi = Math.floor(Date.now() / 2400) % warnings.length;
         warningText.textContent = '⚠ ' + warnings[wi].toUpperCase();
         warningBanner.classList.remove('hidden');
+        // Speak: force if status just changed (e.g. was good, now bad)
+        speak(warnings[0], status !== lastStatus);
+    }
+    lastStatus = status;
+
+    // Announce completed reps
+    if (repState.count > lastRepCount) {
+        lastRepCount = repState.count;
+        speak(String(repState.count), true);
     }
 }
 
@@ -596,7 +725,15 @@ async function init() {
 document.querySelectorAll('.ex-card').forEach(btn => {
     btn.addEventListener('click', () => {
         activeExercise = btn.dataset.ex;
-        if (exerciseBadge) exerciseBadge.textContent = EXERCISES[activeExercise].name;
+        repState      = { count: 0, phase: 'up' };
+        lastRepCount  = 0;
+        lastStatus    = 'unknown';
+        lastSpokenTxt = '';
+        synth.cancel();
+        if (exerciseBadge) {
+            exerciseBadge.textContent = EXERCISES[activeExercise].name;
+            exerciseBadge.dataset.ex  = activeExercise;
+        }
         document.getElementById('exercise-select').classList.add('hidden');
         init();
     });

@@ -11,30 +11,62 @@
 <body>
 
     <div id="exercise-select">
+        <div class="scan-line"></div>
         <div class="ex-inner">
-            <div class="ex-logo">◈ SKELETON</div>
-            <div class="ex-subtitle">SCEGLI ESERCIZIO</div>
+
+            <div class="ex-header">
+                <div class="ex-logo">◈ SKELETON</div>
+                <div class="ex-tagline">ANALISI POSTURALE IN TEMPO REALE</div>
+                <div class="ex-divider-line"></div>
+                <div class="ex-prompt">SELEZIONA MODALITÀ DI ANALISI</div>
+            </div>
+
             <div class="ex-grid">
-                <button class="ex-card" data-ex="postura">
-                    <span class="ex-icon">⬆</span>
-                    <span class="ex-name">POSTURA ERETTA</span>
-                    <span class="ex-desc">Stazione eretta statica</span>
+
+                <button class="ex-card" data-ex="inpiedi">
+                    <div class="ex-fig-wrap">
+                        <img class="ex-fig" src="https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?w=400&h=500&fit=crop&crop=top&q=80" alt="postura in piedi" loading="lazy">
+                    </div>
+                    <div class="ex-card-info">
+                        <span class="ex-name">IN PIEDI</span>
+                        <span class="ex-desc">Colonna · Spalle · Fianchi</span>
+                        <span class="ex-view">FRONTALE / PROFILO</span>
+                    </div>
                 </button>
+
+                <button class="ex-card" data-ex="seduto">
+                    <div class="ex-fig-wrap">
+                        <img class="ex-fig" src="https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=400&h=500&fit=crop&crop=top&q=80" alt="postura seduto" loading="lazy">
+                    </div>
+                    <div class="ex-card-info">
+                        <span class="ex-name">SEDUTO</span>
+                        <span class="ex-desc">Schiena · Testa · Postura</span>
+                        <span class="ex-view">PROFILO</span>
+                    </div>
+                </button>
+
                 <button class="ex-card" data-ex="squat">
-                    <span class="ex-icon">⬇</span>
-                    <span class="ex-name">SQUAT</span>
-                    <span class="ex-desc">Flessione gambe</span>
+                    <div class="ex-fig-wrap">
+                        <img class="ex-fig" src="https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&h=500&fit=crop&crop=top&q=80" alt="squat" loading="lazy">
+                    </div>
+                    <div class="ex-card-info">
+                        <span class="ex-name">SQUAT</span>
+                        <span class="ex-desc">Ginocchio · Schiena · Lean</span>
+                        <span class="ex-view">PROFILO</span>
+                    </div>
                 </button>
-                <button class="ex-card" data-ex="stacco">
-                    <span class="ex-icon">⇡</span>
-                    <span class="ex-name">STACCO</span>
-                    <span class="ex-desc">Hip hinge / deadlift</span>
+
+                <button class="ex-card" data-ex="pushup">
+                    <div class="ex-fig-wrap">
+                        <img class="ex-fig" src="https://images.unsplash.com/photo-1571019613576-2b22c76fd955?w=400&h=500&fit=crop&crop=top&q=80" alt="push-up" loading="lazy">
+                    </div>
+                    <div class="ex-card-info">
+                        <span class="ex-name">PUSH-UP</span>
+                        <span class="ex-desc">Piano corpo · Core · Fianchi</span>
+                        <span class="ex-view">PROFILO</span>
+                    </div>
                 </button>
-                <button class="ex-card" data-ex="plank">
-                    <span class="ex-icon">→</span>
-                    <span class="ex-name">PLANK</span>
-                    <span class="ex-desc">Isometria orizzontale</span>
-                </button>
+
             </div>
         </div>
     </div>
@@ -50,26 +82,52 @@
         <video id="video" playsinline></video>
         <canvas id="canvas"></canvas>
 
+        <!-- Viewfinder corners -->
+        <div class="vf-corners">
+            <div class="vf-c tl"></div>
+            <div class="vf-c tr"></div>
+            <div class="vf-c bl"></div>
+            <div class="vf-c br"></div>
+        </div>
+
         <!-- Top bar -->
         <div id="topbar">
-            <a href="https://alecode25.github.io/Fitora/" class="home-btn" title="Home">⌂</a>
-            <div class="brand">◈ SKELETON</div>
-            <div id="view-badge" class="view-badge">FRONTALE</div>
-            <div id="exercise-badge" class="exercise-badge">POSTURA ERETTA</div>
-            <div id="status-pill" class="status-pill">
-                <span id="status-dot" class="sdot"></span>
-                <span id="status-text">IN ATTESA</span>
+            <div class="tb-left">
+                <a href="https://alecode25.github.io/Fitora/" class="home-btn" title="Home">⌂</a>
+                <div class="brand">◈ SKELETON</div>
+            </div>
+            <div class="tb-center">
+                <div id="exercise-badge" class="exercise-badge" data-ex="inpiedi">IN PIEDI</div>
+                <span class="tb-sep">◆</span>
+                <div id="view-badge" class="view-badge">FRONTALE</div>
+            </div>
+            <div class="tb-right">
+                <div id="status-pill" class="status-pill">
+                    <span id="status-dot" class="sdot"></span>
+                    <span id="status-text">IN ATTESA</span>
+                </div>
+                <button id="voice-btn" class="voice-btn" title="Voce feedback">🔊</button>
             </div>
         </div>
 
         <!-- Spine angle badge -->
         <div id="angle-badge">
             <div class="badge-value" id="spine-angle-val">—°</div>
-            <div class="badge-label">COLONNA</div>
+            <div class="badge-label" id="badge-lbl">COLONNA</div>
+        </div>
+
+        <!-- Rep counter badge -->
+        <div id="rep-badge" class="hidden">
+            <div class="badge-value" id="rep-count-val">0</div>
+            <div class="badge-label">REPS</div>
         </div>
 
         <!-- Metrics panel -->
         <div id="metrics-panel">
+            <div class="metrics-hdr">
+                <span class="mh-dot"></span>
+                <span>ANALISI</span>
+            </div>
             <div class="metric-row" id="m-lat">
                 <span class="m-icon">⟷</span>
                 <span class="m-label">INCL. LAT.</span>
