@@ -12,6 +12,8 @@ const warningBanner = document.getElementById('warning-banner');
 const warningText   = document.getElementById('warning-text');
 const goodBanner    = document.getElementById('good-banner');
 
+const exerciseBadge = document.getElementById('exercise-badge');
+
 const vLat    = document.getElementById('v-lat');
 const vFwd    = document.getElementById('v-fwd');
 const vSpalle = document.getElementById('v-spalle');
@@ -85,6 +87,35 @@ const CONNECTIONS = [
     { a:14, b:16, col:'rgba(105,240,174,0.85)', w:2.5 },
 ];
 
+// ── Exercise configs ──────────────────────────────────────────────────────────
+// fr = frontal rules, pr = profile rules
+// kneeMode: 'lt' = warn if angle < kneeThr (bent when shouldn't), 'gt' = warn if > kneeThr (not bent enough)
+const EXERCISES = {
+    postura: {
+        name: 'POSTURA ERETTA',
+        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
+        pr: { fwdW:18, fwdB:30, headW:8, headB:14, kneeMode:'lt', kneeThr:100 },
+    },
+    squat: {
+        name: 'SQUAT',
+        fr: { spineW:15, spineB:25, shW:8, shB:16, hipW:8, hipB:16 },
+        pr: { fwdW:45, fwdB:65, headW:20, headB:30, kneeMode:'gt', kneeThr:140 },
+    },
+    stacco: {
+        name: 'STACCO',
+        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
+        pr: { fwdW:30, fwdB:50, headW:15, headB:22, kneeMode:'none' },
+    },
+    plank: {
+        name: 'PLANK',
+        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
+        // horizontal=true: good when |angle| 65-105°, warn outside, bad < 50° or > 115°
+        pr: { horizontal:true, angLowB:50, angLowW:65, angHighW:105, angHighB:115, headW:25, headB:35, kneeMode:'none' },
+    },
+};
+
+let activeExercise = 'postura';
+
 // ── View mode detection ───────────────────────────────────────────────────────
 
 let _stableView = 'frontal';
@@ -143,7 +174,7 @@ function analyzePosture(lm, viewMode) {
     const res = {
         visible: false, viewMode,
         screenAngle: 0,
-        shoulderAsym: 0, hipAsym: 0, headFwd: 0,
+        shoulderAsym: 0, hipAsym: 0, headFwd: 0, kneeAngle: null,
         score: 0, warnings: [], status: 'unknown',
     };
 
@@ -174,41 +205,64 @@ function analyzePosture(lm, viewMode) {
         res.headFwd = Math.abs(nose.x - nearS.x) * 100;
     }
 
+    const ex   = EXERCISES[activeExercise];
     const warn = [];
 
     if (!isProfile) {
         // ── FRONTAL ──
-        if (Math.abs(res.screenAngle) > 15) {
+        const fr = ex.fr;
+        if (Math.abs(res.screenAngle) > fr.spineW) {
             const dir = res.screenAngle > 0 ? 'destra' : 'sinistra';
             warn.push(`Schiena inclinata ${Math.round(Math.abs(res.screenAngle))}° verso ${dir}`);
         }
-        if (res.shoulderAsym > 6) {
+        if (res.shoulderAsym > fr.shW) {
             const low = rs.y > ls.y ? 'destra' : 'sinistra';
             warn.push(`Spalla ${low} più bassa — equilibra le spalle`);
         }
-        if (res.hipAsym > 5) {
+        if (res.hipAsym > fr.hipW) {
             const low = rh.y > lh.y ? 'destra' : 'sinistra';
             warn.push(`Anca ${low} più bassa — controlla l'allineamento`);
         }
     } else {
         // ── PROFILE ──
-        // screenAngle in profile = sagittal lean (forward/backward)
+        const pr  = ex.pr;
         const fwd = Math.abs(res.screenAngle);
-        if (fwd > 30) {
-            warn.push(`Schiena troppo inclinata in avanti — ${Math.round(fwd)}° dalla verticale`);
-        } else if (fwd > 18) {
-            warn.push(`Inclinazione in avanti — ${Math.round(fwd)}° dalla verticale`);
+
+        if (pr.horizontal) {
+            // PLANK: body should be horizontal (|angle| ≈ 90°)
+            if (fwd < pr.angLowB) {
+                warn.push('Posizionati di profilo per il plank');
+            } else if (fwd < pr.angLowW) {
+                warn.push('Fianchi troppo alti — abbassa il bacino');
+            } else if (fwd > pr.angHighB) {
+                warn.push('Fianchi che cedono — stringi il core');
+            } else if (fwd > pr.angHighW) {
+                warn.push('Fianchi leggermente bassi — stringi il core');
+            }
+        } else {
+            if (fwd > pr.fwdB) {
+                warn.push(`Schiena troppo inclinata — ${Math.round(fwd)}° dalla verticale`);
+            } else if (fwd > pr.fwdW) {
+                warn.push(`Inclinazione in avanti — ${Math.round(fwd)}° dalla verticale`);
+            }
         }
-        if (res.headFwd > 12) {
+
+        if (res.headFwd > pr.headW) {
             warn.push('Testa in avanti — rientra il mento');
         }
-        // Knee over ankle check
+
+        // Knee angle
         const nearKnee  = viewMode === 'profile-left' ? lm[KP.L_KNEE]  : lm[KP.R_KNEE];
         const nearAnkle = viewMode === 'profile-left' ? lm[KP.L_ANKLE] : lm[KP.R_ANKLE];
         if (nearH && nearKnee?.score > 0.4 && nearAnkle?.score > 0.4) {
-            const kneeAngle = angleBetween3pts(nearH, nearKnee, nearAnkle);
-            if (kneeAngle !== null && kneeAngle < 100) {
-                warn.push(`Ginocchio piegato ${Math.round(kneeAngle)}° — controlla la posizione`);
+            const ka = angleBetween3pts(nearH, nearKnee, nearAnkle);
+            if (ka !== null) {
+                res.kneeAngle = ka;
+                if (pr.kneeMode === 'lt' && ka < pr.kneeThr) {
+                    warn.push(`Ginocchio piegato ${Math.round(ka)}° — controlla la posizione`);
+                } else if (pr.kneeMode === 'gt' && ka > pr.kneeThr) {
+                    warn.push(`Ginocchio troppo dritto ${Math.round(ka)}° — scendi di più`);
+                }
             }
         }
     }
@@ -360,11 +414,12 @@ function updateUI(posture, viewMode, hasBody) {
     viewBadge.textContent = isProfile ? 'PROFILO' : 'FRONTALE';
     viewBadge.className   = 'view-badge' + (isProfile ? ' profile' : '');
 
-    // Update metric labels per view
+    // Update metric labels per view / exercise
+    const ex = EXERCISES[activeExercise];
     if (isProfile) {
-        lblLat.textContent    = 'INCL. AVANTI';
+        lblLat.textContent    = ex.pr.horizontal ? 'PIANO' : 'INCL. AVANTI';
         lblFwd.textContent    = 'TESTA AVANTI';
-        lblSpalle.textContent = 'GINOCCHIO';
+        lblSpalle.textContent = (activeExercise === 'postura' || activeExercise === 'squat') ? 'GINOCCHIO' : '—';
     } else {
         lblLat.textContent    = 'INCL. LAT.';
         lblFwd.textContent    = 'ASIMM. SPALLE';
@@ -386,27 +441,57 @@ function updateUI(posture, viewMode, hasBody) {
 
     // Primary angle badge
     const mainAng = Math.round(Math.abs(posture.screenAngle));
-    angleVal.textContent = mainAng + '°';
-    const thr = isProfile ? [18, 30] : [15, 25];
-    angleBadge.className = mainAng < thr[0] ? 'good' : mainAng < thr[1] ? 'warning' : 'bad';
+    const { pr, fr } = ex;
+
+    if (isProfile && pr.horizontal) {
+        // Plank: show deviation from horizontal (0° = perfect)
+        const devH = Math.round(Math.abs(90 - mainAng));
+        angleVal.textContent = devH + '°';
+        const a = mainAng;
+        angleBadge.className = (a >= pr.angLowW && a <= pr.angHighW) ? 'good'
+                             : (a <  pr.angLowB  || a >  pr.angHighB) ? 'bad' : 'warning';
+    } else {
+        angleVal.textContent = mainAng + '°';
+        const thr = isProfile ? [pr.fwdW, pr.fwdB] : [fr.spineW, fr.spineB];
+        angleBadge.className = mainAng < thr[0] ? 'good' : mainAng < thr[1] ? 'warning' : 'bad';
+    }
 
     if (!isProfile) {
-        const ls = mainAng < 15 ? 'good' : mainAng < 25 ? 'warning' : 'bad';
+        const ls = mainAng < fr.spineW ? 'good' : mainAng < fr.spineB ? 'warning' : 'bad';
         setMV(vLat, mLat, mainAng + '°', ls);
 
-        const as = posture.shoulderAsym < 6 ? 'good' : posture.shoulderAsym < 12 ? 'warning' : 'bad';
+        const as = posture.shoulderAsym < fr.shW ? 'good' : posture.shoulderAsym < fr.shB ? 'warning' : 'bad';
         setMV(vFwd, mFwd, Math.round(posture.shoulderAsym) + '%', as);
 
-        const hs = posture.hipAsym < 5 ? 'good' : posture.hipAsym < 10 ? 'warning' : 'bad';
+        const hs = posture.hipAsym < fr.hipW ? 'good' : posture.hipAsym < fr.hipB ? 'warning' : 'bad';
         setMV(vSpalle, mSpalle, Math.round(posture.hipAsym) + '%', hs);
+    } else if (pr.horizontal) {
+        // Plank profile
+        const devH = Math.round(Math.abs(90 - mainAng));
+        const a  = mainAng;
+        const ps = (a >= pr.angLowW && a <= pr.angHighW) ? 'good'
+                 : (a <  pr.angLowB  || a >  pr.angHighB) ? 'bad' : 'warning';
+        setMV(vLat, mLat, devH + '°', ps);
+
+        const hf = posture.headFwd;
+        setMV(vFwd, mFwd, Math.round(hf) + '%', hf < pr.headW ? 'good' : hf < pr.headB ? 'warning' : 'bad');
+        setMV(vSpalle, mSpalle, '—', '');
     } else {
-        const fs = mainAng < 18 ? 'good' : mainAng < 30 ? 'warning' : 'bad';
+        const fs = mainAng < pr.fwdW ? 'good' : mainAng < pr.fwdB ? 'warning' : 'bad';
         setMV(vLat, mLat, mainAng + '°', fs);
 
         const hf = posture.headFwd;
-        const hfs = hf < 8 ? 'good' : hf < 14 ? 'warning' : 'bad';
-        setMV(vFwd, mFwd, Math.round(hf) + '%', hfs);
-        setMV(vSpalle, mSpalle, '—', '');
+        setMV(vFwd, mFwd, Math.round(hf) + '%', hf < pr.headW ? 'good' : hf < pr.headB ? 'warning' : 'bad');
+
+        if (posture.kneeAngle !== null && pr.kneeMode !== 'none') {
+            const ka = posture.kneeAngle;
+            const ks = pr.kneeMode === 'lt'
+                ? (ka >= pr.kneeThr ? 'good' : ka >= pr.kneeThr - 25 ? 'warning' : 'bad')
+                : (ka <= pr.kneeThr - 30 ? 'good' : ka <= pr.kneeThr ? 'warning' : 'bad');
+            setMV(vSpalle, mSpalle, Math.round(ka) + '°', ks);
+        } else {
+            setMV(vSpalle, mSpalle, '—', '');
+        }
     }
 
     const { warnings, status } = posture;
@@ -507,4 +592,12 @@ async function init() {
     }
 }
 
-init();
+// ── Exercise selection ────────────────────────────────────────────────────────
+document.querySelectorAll('.ex-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+        activeExercise = btn.dataset.ex;
+        if (exerciseBadge) exerciseBadge.textContent = EXERCISES[activeExercise].name;
+        document.getElementById('exercise-select').classList.add('hidden');
+        init();
+    });
+});

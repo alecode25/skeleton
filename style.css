@@ -269,3 +269,91 @@ body::after {
     to   { opacity:1; transform: translateX(-50%) translateY(0); }
 }
 .hidden { display: none !important; }
+
+/* ── Exercise selection ── */
+#exercise-select {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    transition: opacity 0.4s ease;
+}
+#exercise-select.hidden { opacity: 0; pointer-events: none; }
+
+.ex-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 32px 24px;
+    width: 100%;
+    max-width: 440px;
+}
+
+.ex-logo {
+    font-family: var(--display);
+    font-size: 26px;
+    letter-spacing: 0.15em;
+    color: rgba(255,255,255,0.9);
+}
+
+.ex-subtitle {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: rgba(255,255,255,0.3);
+}
+
+.ex-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+}
+
+.ex-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 22px 14px;
+    background: rgba(0,229,255,0.04);
+    border: 1px solid rgba(0,229,255,0.14);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    font-family: var(--mono);
+    text-align: center;
+}
+.ex-card:hover {
+    background: rgba(0,229,255,0.10);
+    border-color: rgba(0,229,255,0.5);
+    transform: translateY(-2px);
+}
+.ex-icon {
+    font-size: 22px;
+    color: var(--cyan);
+}
+.ex-name {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+}
+.ex-desc {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: rgba(255,255,255,0.3);
+}
+
+/* ── Exercise badge (topbar) ── */
+.exercise-badge {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    padding: 4px 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(6px);
+}
