@@ -449,7 +449,7 @@ body {
     align-items: center;
     gap: 7px;
     padding: 7px 12px;
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 0.25em;
     color: rgba(255, 255, 255, 0.35);
     font-family: var(--mono);
@@ -471,7 +471,7 @@ body {
     align-items: center;
     gap: 8px;
     padding: 7px 12px;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.08em;
     border-bottom: 1px solid var(--border);
     border-left: 2px solid transparent;
@@ -552,17 +552,18 @@ body {
     bottom: 22px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(255, 23, 68, 0.15);
+    background: darkred;
     border: 1px solid rgba(255, 23, 68, 0.65);
     backdrop-filter: blur(10px);
     padding: 10px 28px;
-    font-size: 11px;
+    font-size: 18px;
     letter-spacing: 0.16em;
     color: #fff;
     text-align: center;
     white-space: nowrap;
     z-index: 10;
     animation: fadeInUp 0.3s ease, warnGlow 1.4s ease-in-out infinite;
+    font-weight: 800;
 }
 
 #good-banner {
@@ -570,15 +571,17 @@ body {
     bottom: 22px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 230, 118, 0.1);
+    background: green;
     border: 1px solid rgba(0, 230, 118, 0.55);
     backdrop-filter: blur(10px);
     padding: 10px 32px;
-    font-size: 11px;
+    font-size: 18px;
     letter-spacing: 0.22em;
     color: var(--green);
     white-space: nowrap;
     z-index: 10;
+    color: white;
+    font-weight: 900;
     animation: fadeInUp 0.3s ease, goodGlow 2s ease-in-out infinite;
 }
 
