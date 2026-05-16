@@ -23,34 +23,37 @@ const vfCorners = document.querySelector('.vf-corners');
 const vLat    = document.getElementById('v-lat');
 const vFwd    = document.getElementById('v-fwd');
 const vSpalle = document.getElementById('v-spalle');
+const vExtra  = document.getElementById('v-extra');
 const vScore  = document.getElementById('v-score');
 const mLat    = document.getElementById('m-lat');
 const mFwd    = document.getElementById('m-fwd');
 const mSpalle = document.getElementById('m-spalle');
+const mExtra  = document.getElementById('m-extra');
 const lblLat    = document.getElementById('m-lat').querySelector('.m-label');
 const lblFwd    = document.getElementById('lbl-fwd');
 const lblSpalle = document.getElementById('lbl-spalle');
+const lblExtra  = document.getElementById('lbl-extra');
 
-// ── MoveNet keypoint indices ──────────────────────────────────────────────────
+// ── MoveNet keypoint indices (17 punti) ───────────────────────────────────────
 const KP = {
-    NOSE:           0,
-    L_EYE: 1, R_EYE: 2, L_EAR: 3, R_EAR: 4,
-    L_SHOULDER:     5,  R_SHOULDER:  6,
-    L_ELBOW:        7,  R_ELBOW:     8,
-    L_WRIST:        9,  R_WRIST:    10,
-    L_HIP:         11,  R_HIP:      12,
-    L_KNEE:        13,  R_KNEE:     14,
-    L_ANKLE:       15,  R_ANKLE:    16,
+    NOSE: 0,
+    L_EYE: 1, R_EYE: 2,
+    L_EAR: 3, R_EAR: 4,
+    L_SHOULDER: 5,  R_SHOULDER: 6,
+    L_ELBOW:    7,  R_ELBOW:    8,
+    L_WRIST:    9,  R_WRIST:   10,
+    L_HIP:     11,  R_HIP:     12,
+    L_KNEE:    13,  R_KNEE:    14,
+    L_ANKLE:   15,  R_ANKLE:   16,
 };
 
-// ── Skeleton visuals ──────────────────────────────────────────────────────────
-// Index → color
+// ── Colori per articolazione ──────────────────────────────────────────────────
 const JOINT_COL = [
     '#ff6b6b',  // 0  nose
-    '#ff6b6b',  // 1  l_eye
-    '#ff6b6b',  // 2  r_eye
-    '#ff6b6b',  // 3  l_ear
-    '#ff6b6b',  // 4  r_ear
+    '#ff9090',  // 1  l_eye
+    '#ff9090',  // 2  r_eye
+    '#ffa07a',  // 3  l_ear
+    '#ffa07a',  // 4  r_ear
     '#ff9f43',  // 5  l_shoulder  ← key
     '#ff9f43',  // 6  r_shoulder  ← key
     '#4b9eff',  // 7  l_elbow
@@ -59,80 +62,77 @@ const JOINT_COL = [
     '#4b9eff',  // 10 r_wrist
     '#ff9f43',  // 11 l_hip       ← key
     '#ff9f43',  // 12 r_hip       ← key
-    '#69f0ae',  // 13 l_knee
-    '#69f0ae',  // 14 r_knee
-    '#69f0ae',  // 15 l_ankle
-    '#69f0ae',  // 16 r_ankle
+    '#69f0ae',  // 13 l_knee      ← key
+    '#69f0ae',  // 14 r_knee      ← key
+    '#00e5ff',  // 15 l_ankle
+    '#00e5ff',  // 16 r_ankle
 ];
-const KEY_JOINTS = new Set([5, 6, 11, 12]);
+
+const KEY_JOINTS = new Set([5, 6, 11, 12, 13, 14]);
 
 const CONNECTIONS = [
-    // Face
-    { a:3,  b:1,  col:'rgba(255,107,107,0.55)' },
-    { a:1,  b:0,  col:'rgba(255,107,107,0.55)' },
-    { a:0,  b:2,  col:'rgba(255,107,107,0.55)' },
-    { a:2,  b:4,  col:'rgba(255,107,107,0.55)' },
-    // Shoulder bar
-    { a:5,  b:6,  col:'rgba(0,229,255,0.80)',   w:2.5 },
-    // Left arm
-    { a:5,  b:7,  col:'rgba(75,158,255,0.85)',  w:2.5 },
-    { a:7,  b:9,  col:'rgba(75,158,255,0.85)',  w:2.5 },
-    // Right arm
-    { a:6,  b:8,  col:'rgba(75,158,255,0.85)',  w:2.5 },
-    { a:8,  b:10, col:'rgba(75,158,255,0.85)',  w:2.5 },
+    // Faccia
+    { a:3,  b:1,  col:'rgba(255,107,107,0.50)' },
+    { a:1,  b:0,  col:'rgba(255,107,107,0.50)' },
+    { a:0,  b:2,  col:'rgba(255,107,107,0.50)' },
+    { a:2,  b:4,  col:'rgba(255,107,107,0.50)' },
+    // Collo (orecchie → spalle) — punti aggiuntivi
+    { a:3,  b:5,  col:'rgba(255,159,67,0.55)',  w:1.8 },
+    { a:4,  b:6,  col:'rgba(255,159,67,0.55)',  w:1.8 },
+    // Barra spalle
+    { a:5,  b:6,  col:'rgba(0,229,255,0.85)',   w:2.8 },
+    // Braccio sinistro
+    { a:5,  b:7,  col:'rgba(75,158,255,0.88)',  w:2.5 },
+    { a:7,  b:9,  col:'rgba(75,158,255,0.88)',  w:2.5 },
+    // Braccio destro
+    { a:6,  b:8,  col:'rgba(75,158,255,0.88)',  w:2.5 },
+    { a:8,  b:10, col:'rgba(75,158,255,0.88)',  w:2.5 },
     // Torso
-    { a:5,  b:11, col:'rgba(255,159,67,0.85)',  w:2.5 },
-    { a:6,  b:12, col:'rgba(255,159,67,0.85)',  w:2.5 },
-    // Hip bar
-    { a:11, b:12, col:'rgba(0,229,255,0.80)',   w:2.5 },
-    // Left leg
-    { a:11, b:13, col:'rgba(105,240,174,0.85)', w:2.5 },
-    { a:13, b:15, col:'rgba(105,240,174,0.85)', w:2.5 },
-    // Right leg
-    { a:12, b:14, col:'rgba(105,240,174,0.85)', w:2.5 },
-    { a:14, b:16, col:'rgba(105,240,174,0.85)', w:2.5 },
+    { a:5,  b:11, col:'rgba(255,159,67,0.88)',  w:2.8 },
+    { a:6,  b:12, col:'rgba(255,159,67,0.88)',  w:2.8 },
+    // Barra fianchi
+    { a:11, b:12, col:'rgba(0,229,255,0.85)',   w:2.8 },
+    // Gamba sinistra
+    { a:11, b:13, col:'rgba(105,240,174,0.88)', w:2.5 },
+    { a:13, b:15, col:'rgba(105,240,174,0.88)', w:2.5 },
+    // Gamba destra
+    { a:12, b:14, col:'rgba(105,240,174,0.88)', w:2.5 },
+    { a:14, b:16, col:'rgba(105,240,174,0.88)', w:2.5 },
 ];
 
 // ── Exercise configs ──────────────────────────────────────────────────────────
-// fr = frontal rules, pr = profile rules
-// kneeMode: 'lt' = warn if angle < kneeThr (bent when shouldn't), 'gt' = warn if > kneeThr (not bent enough)
 const EXERCISES = {
-    // Standing upright — strictest alignment check
     inpiedi: {
         name: 'IN PIEDI',
-        fr: { spineW:10, spineB:18, shW:5, shB:10, hipW:4, hipB:8 },
-        pr: { fwdW:15, fwdB:25, headW:8, headB:14, kneeMode:'none' },
+        fr: { spineW:10, spineB:18, shW:5, shB:10, hipW:4, hipB:8, earW:4, earB:8 },
+        pr: { fwdW:15, fwdB:25, headW:8, headB:14, neckW:8, neckB:16, kneeMode:'none' },
     },
-    // Seated at desk — more forward lean allowed
     seduto: {
         name: 'SEDUTO',
-        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
-        pr: { fwdW:25, fwdB:40, headW:10, headB:18, kneeMode:'none' },
+        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10, earW:5, earB:10 },
+        pr: { fwdW:25, fwdB:40, headW:10, headB:18, neckW:12, neckB:22, kneeMode:'none' },
     },
-    // Squat — profile, check knee bends enough
     squat: {
         name: 'SQUAT',
-        fr: { spineW:15, spineB:28, shW:8, shB:16, hipW:8, hipB:16 },
-        pr: { fwdW:40, fwdB:60, headW:18, headB:28, kneeMode:'gt', kneeThr:130 },
+        fr: { spineW:15, spineB:28, shW:8, shB:16, hipW:8, hipB:16, earW:8, earB:16, kneeValgusW:20, kneeValgusB:38 },
+        pr: { fwdW:40, fwdB:60, headW:18, headB:28, neckW:15, neckB:25, kneeMode:'gt', kneeThr:130, shinLeanMin:8 },
     },
-    // Push-up — profile, body must stay horizontal
     pushup: {
         name: 'PUSH-UP',
-        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10 },
-        pr: { horizontal:true, angLowB:50, angLowW:65, angHighW:105, angHighB:115, headW:25, headB:35, kneeMode:'none' },
+        fr: { spineW:15, spineB:25, shW:6, shB:12, hipW:5, hipB:10, earW:8, earB:14 },
+        pr: { horizontal:true, angLowB:50, angLowW:65, angHighW:105, angHighB:115, headW:25, headB:35, neckW:15, neckB:25, kneeMode:'none', wristW:8, wristB:16 },
     },
 };
 
 let activeExercise = 'inpiedi';
 let repState = { count: 0, phase: 'up' };
 
-// ── Keypoint smoothing (EMA) ──────────────────────────────────────────────────
-// Higher SMOOTH_ALPHA = more stable but more lag; 0.55 is a good balance
+// ── Smoothing EMA ─────────────────────────────────────────────────────────────
 const SMOOTH_ALPHA  = 0.55;
-const SCORE_ALPHA   = 0.40;  // score smoothed less aggressively
+const SCORE_ALPHA   = 0.40;
 let   smoothedKps   = null;
 let   missingFrames = 0;
-const MAX_MISSING   = 10;    // hold last pose ~330ms before clearing
+const MAX_MISSING   = 10;
 
 function smoothKeypoints(raw) {
     if (!raw) return null;
@@ -152,30 +152,20 @@ function smoothKeypoints(raw) {
 }
 
 // ── Person validator ──────────────────────────────────────────────────────────
-// Rejects objects/ghosts: needs enough confident keypoints + plausible torso
 function isValidPerson(kps) {
     if (!kps || kps.length < 17) return false;
-
-    // Need at least 5 keypoints above confidence threshold
-    const highConf = kps.filter(kp => kp.score > 0.30).length;
-    if (highConf < 5) return false;
-
+    const highConf = kps.filter(kp => kp.score > 0.25).length;
+    if (highConf < 4) return false;
     const ls = kps[KP.L_SHOULDER], rs = kps[KP.R_SHOULDER];
     const lh = kps[KP.L_HIP],     rh = kps[KP.R_HIP];
-
-    // At least one shoulder must be confident
-    if (ls.score < 0.25 && rs.score < 0.25) return false;
-
-    // Torso height: mid-shoulders to mid-hips must occupy ≥7% of frame height
+    if (ls.score < 0.20 && rs.score < 0.20) return false;
     const syMid  = (ls.y + rs.y) / 2;
     const hyMid  = (lh.y + rh.y) / 2;
-    const torsoH = Math.abs(syMid - hyMid);
-    if (torsoH < 0.07) return false;
-
+    if (Math.abs(syMid - hyMid) < 0.06) return false;
     return true;
 }
 
-// ── Speech synthesis ──────────────────────────────────────────────────────────
+// ── Speech ────────────────────────────────────────────────────────────────────
 const synth       = window.speechSynthesis;
 let voiceEnabled  = true;
 let lastSpokenTxt = '';
@@ -193,7 +183,6 @@ function speak(text, force = false) {
     utt.lang     = 'it-IT';
     utt.rate     = 0.92;
     utt.volume   = 1;
-    // prefer Italian voice if available
     const voices = synth.getVoices();
     const itVoice = voices.find(v => v.lang.startsWith('it'));
     if (itVoice) utt.voice = itVoice;
@@ -209,24 +198,19 @@ voiceBtn.addEventListener('click', () => {
     if (!voiceEnabled) synth.cancel();
 });
 
-// ── View mode detection ───────────────────────────────────────────────────────
-
+// ── View detection ────────────────────────────────────────────────────────────
 let _stableView = 'frontal';
 let _viewCount  = 0;
 
 function detectViewMode(lm) {
     const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
     if (!ls || !rs) return _stableView;
-
-    const visDiff  = Math.abs(ls.score - rs.score);
-    // Normalized shoulder X-span (close to 0 = profile)
-    const xSpan    = Math.abs(ls.x - rs.x);
-
-    let detected = 'frontal';
+    const visDiff = Math.abs(ls.score - rs.score);
+    const xSpan   = Math.abs(ls.x - rs.x);
+    let detected  = 'frontal';
     if (visDiff > 0.28 || xSpan < 0.09) {
         detected = ls.score >= rs.score ? 'profile-left' : 'profile-right';
     }
-
     if (detected === _stableView) {
         _viewCount = Math.min(_viewCount + 1, 20);
     } else {
@@ -236,25 +220,18 @@ function detectViewMode(lm) {
     return _stableView;
 }
 
-// ── Metric smoothing + status hysteresis ─────────────────────────────────────
-// Second smoothing layer: on COMPUTED values (angles/asymmetries).
-// Keypoint EMA removes position jitter; this removes threshold-crossing flicker.
-const METRIC_ALPHA  = 0.62;   // 0=raw, 1=frozen. 0.62 ≈ 3-frame lag
-const STATUS_WINDOW = 12;     // frames in voting window for status stability
-const _sm = {};               // metric smooth state
-let   _statusHist = [];       // recent raw status strings
+// ── Metric smoothing ──────────────────────────────────────────────────────────
+const METRIC_ALPHA  = 0.62;
+const STATUS_WINDOW = 12;
+const _sm = {};
+let   _statusHist = [];
 
-// Smooth any named numeric metric
 function smv(key, val) {
     if (val === null || val === undefined) return val;
-    _sm[key] = (key in _sm)
-        ? METRIC_ALPHA * _sm[key] + (1 - METRIC_ALPHA) * val
-        : val;
+    _sm[key] = (key in _sm) ? METRIC_ALPHA * _sm[key] + (1 - METRIC_ALPHA) * val : val;
     return _sm[key];
 }
 
-// Majority-vote over last STATUS_WINDOW frames.
-// Requires 60% agreement for bad/good, otherwise stays warning.
 function stableStatus(raw) {
     _statusHist.push(raw);
     if (_statusHist.length > STATUS_WINDOW) _statusHist.shift();
@@ -272,15 +249,12 @@ function resetSmoothState() {
 }
 
 // ── Angles ────────────────────────────────────────────────────────────────────
-
 function computeScreenAngle(lm) {
     const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
     const lh = lm[KP.L_HIP],     rh = lm[KP.R_HIP];
     if (!ls || !rs || !lh || !rh) return 0;
-
     const sX = (ls.x + rs.x) / 2, sY = (ls.y + rs.y) / 2;
     const hX = (lh.x + rh.x) / 2, hY = (lh.y + rh.y) / 2;
-    // Vector hips→shoulders, angle from vertical (positive = tilted right)
     return Math.atan2(sX - hX, hY - sY) * (180 / Math.PI);
 }
 
@@ -293,8 +267,7 @@ function angleBetween3pts(A, B, C) {
     return Math.acos(Math.min(1, Math.max(-1, dot / mag))) * (180 / Math.PI);
 }
 
-// ── Posture analysis ──────────────────────────────────────────────────────────
-
+// ── Analisi postura ───────────────────────────────────────────────────────────
 function analyzePosture(lm, viewMode) {
     const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
     const lh = lm[KP.L_HIP],     rh = lm[KP.R_HIP];
@@ -303,17 +276,18 @@ function analyzePosture(lm, viewMode) {
         visible: false, viewMode,
         screenAngle: 0,
         shoulderAsym: 0, hipAsym: 0, headFwd: 0,
+        earAsym: null, neckFwd: null,
+        kneeValgus: null, shinLean: null, wristShoulderDev: null,
         kneeAngle: null, elbowAngle: null, hipDepth: null, phase: null,
         score: 0, warnings: [], status: 'unknown',
     };
 
     if (!ls || !rs || !lh || !rh) return res;
 
-    const isProfile  = viewMode !== 'frontal';
+    const isProfile = viewMode !== 'frontal';
     const nearS = isProfile ? (viewMode === 'profile-left' ? ls : rs) : null;
     const nearH = isProfile ? (viewMode === 'profile-left' ? lh : rh) : null;
 
-    // Score: best visible side in profile, average in frontal
     const sScore = isProfile ? Math.max(ls.score, rs.score) : (ls.score + rs.score) / 2;
     const hScore = isProfile ? Math.max(lh.score, rh.score) : (lh.score + rh.score) / 2;
     res.score = Math.round(((sScore + hScore) / 2) * 100);
@@ -321,16 +295,15 @@ function analyzePosture(lm, viewMode) {
     const minVis = isProfile
         ? Math.min(nearS?.score ?? 0, nearH?.score ?? 0)
         : Math.min(ls.score, rs.score, lh.score, rh.score);
-    if (minVis < 0.2) return res;
+    if (minVis < 0.18) return res;
 
     res.visible      = true;
     res.screenAngle  = smv('screenAngle',  computeScreenAngle(lm));
     res.shoulderAsym = smv('shoulderAsym', Math.abs(ls.y - rs.y) * 100);
     res.hipAsym      = smv('hipAsym',      Math.abs(lh.y - rh.y) * 100);
 
-    // Head forward check (nose X vs shoulder X in profile)
     const nose = lm[KP.NOSE];
-    if (isProfile && nose && nose.score > 0.4 && nearS) {
+    if (isProfile && nose && nose.score > 0.35 && nearS) {
         res.headFwd = smv('headFwd', Math.abs(nose.x - nearS.x) * 100);
     }
 
@@ -338,8 +311,9 @@ function analyzePosture(lm, viewMode) {
     const warn = [];
 
     if (!isProfile) {
-        // ── FRONTAL ──
+        // ── FRONTALE ──────────────────────────────────────────────────────────
         const fr = ex.fr;
+
         if (Math.abs(res.screenAngle) > fr.spineW) {
             const dir = res.screenAngle > 0 ? 'destra' : 'sinistra';
             warn.push(`Schiena inclinata ${Math.round(Math.abs(res.screenAngle))}° verso ${dir}`);
@@ -352,13 +326,42 @@ function analyzePosture(lm, viewMode) {
             const low = rh.y > lh.y ? 'destra' : 'sinistra';
             warn.push(`Anca ${low} più bassa — controlla l'allineamento`);
         }
+
+        // Simmetria orecchie → inclinazione testa
+        const le = lm[KP.L_EAR], re = lm[KP.R_EAR];
+        if (le?.score > 0.22 && re?.score > 0.22) {
+            res.earAsym = smv('earAsym', Math.abs(le.y - re.y) * 100);
+            if (res.earAsym > (fr.earB ?? 8)) {
+                const low = re.y > le.y ? 'destra' : 'sinistra';
+                warn.push(`Testa inclinata — orecchio ${low} più basso`);
+            } else if (res.earAsym > (fr.earW ?? 4)) {
+                warn.push('Testa leggermente inclinata — centra la testa');
+            }
+        }
+
+        // Knee valgus per squat (ginocchia che cedono verso il centro)
+        if (activeExercise === 'squat') {
+            const lk = lm[KP.L_KNEE], rk = lm[KP.R_KNEE];
+            const la = lm[KP.L_ANKLE], ra = lm[KP.R_ANKLE];
+            if (lk?.score > 0.28 && rk?.score > 0.28 && la?.score > 0.28 && ra?.score > 0.28) {
+                const kneeDist  = Math.abs(lk.x - rk.x);
+                const ankleDist = Math.abs(la.x - ra.x);
+                const ratio = ankleDist > 0.01 ? kneeDist / ankleDist : 1;
+                res.kneeValgus = smv('kneeValgus', Math.max(0, (1 - ratio) * 100));
+                if (ratio < 0.62) {
+                    warn.push("Ginocchia cedono verso l'interno — spingi verso l'esterno");
+                } else if (ratio < 0.78) {
+                    warn.push('Allinea le ginocchia con le punte dei piedi');
+                }
+            }
+        }
+
     } else {
-        // ── PROFILE ──
+        // ── PROFILO ───────────────────────────────────────────────────────────
         const pr  = ex.pr;
         const fwd = Math.abs(res.screenAngle);
 
         if (pr.horizontal) {
-            // PLANK: body should be horizontal (|angle| ≈ 90°)
             if (fwd < pr.angLowB) {
                 warn.push('Posizionati di profilo per il plank');
             } else if (fwd < pr.angLowW) {
@@ -376,14 +379,29 @@ function analyzePosture(lm, viewMode) {
             }
         }
 
+        // Testa in avanti (naso)
         if (res.headFwd > pr.headW) {
             warn.push('Testa in avanti — rientra il mento');
         }
 
-        // Knee angle
+        // Collo in avanti via orecchio (più preciso del naso)
+        const nearEar = viewMode === 'profile-left' ? lm[KP.L_EAR] : lm[KP.R_EAR];
+        if (nearEar?.score > 0.25 && nearS) {
+            const offset = viewMode === 'profile-left'
+                ? (nearEar.x - nearS.x) * 100
+                : (nearS.x - nearEar.x) * 100;
+            res.neckFwd = smv('neckFwd', Math.max(0, offset));
+            if (res.neckFwd > (pr.neckB ?? 16)) {
+                warn.push('Postura testa in avanti — rientra il collo');
+            } else if (res.neckFwd > (pr.neckW ?? 8)) {
+                warn.push('Collo protratto — solleva leggermente il mento');
+            }
+        }
+
+        // Angolo ginocchio (hip-knee-ankle)
         const nearKnee  = viewMode === 'profile-left' ? lm[KP.L_KNEE]  : lm[KP.R_KNEE];
         const nearAnkle = viewMode === 'profile-left' ? lm[KP.L_ANKLE] : lm[KP.R_ANKLE];
-        if (nearH && nearKnee?.score > 0.4 && nearAnkle?.score > 0.4) {
+        if (nearH && nearKnee?.score > 0.35 && nearAnkle?.score > 0.35) {
             const ka = angleBetween3pts(nearH, nearKnee, nearAnkle);
             if (ka !== null) {
                 res.kneeAngle = smv('kneeAngle', ka);
@@ -395,22 +413,43 @@ function analyzePosture(lm, viewMode) {
             }
         }
 
-        // ── Hip depth (squat only): positive = hip below knee ──
-        if (activeExercise === 'squat' && nearH && nearKnee?.score > 0.3) {
-            res.hipDepth = smv('hipDepth', nearH.y - nearKnee.y);
-        }
-
-        // ── Elbow angle (push-up only) ──
-        if (activeExercise === 'pushup') {
-            const nearElbow = viewMode === 'profile-left' ? lm[KP.L_ELBOW] : lm[KP.R_ELBOW];
-            const nearWrist = viewMode === 'profile-left' ? lm[KP.L_WRIST] : lm[KP.R_WRIST];
-            if (nearS && nearElbow?.score > 0.3 && nearWrist?.score > 0.3) {
-                const ea = angleBetween3pts(nearS, nearElbow, nearWrist);
-                if (ea !== null) res.elbowAngle = smv('elbowAngle', ea);
+        // Inclinazione tibia (shin lean) → indica mobilità caviglia nello squat
+        if (activeExercise === 'squat' && nearAnkle?.score > 0.30 && nearKnee?.score > 0.30) {
+            const rawLean = Math.atan2(
+                nearKnee.x - nearAnkle.x,
+                nearAnkle.y - nearKnee.y
+            ) * (180 / Math.PI);
+            const lean = viewMode === 'profile-right' ? -rawLean : rawLean;
+            res.shinLean = smv('shinLean', lean);
+            if (res.kneeAngle !== null && res.kneeAngle < 145 && lean < (pr.shinLeanMin ?? 8)) {
+                warn.push('Tallone che si solleva — lavora sulla mobilità della caviglia');
             }
         }
 
-        // ── Rep counting ──
+        // Profondità anca (squat)
+        if (activeExercise === 'squat' && nearH && nearKnee?.score > 0.28) {
+            res.hipDepth = smv('hipDepth', nearH.y - nearKnee.y);
+        }
+
+        // Angolo gomito + offset polso (push-up)
+        if (activeExercise === 'pushup') {
+            const nearElbow = viewMode === 'profile-left' ? lm[KP.L_ELBOW] : lm[KP.R_ELBOW];
+            const nearWrist = viewMode === 'profile-left' ? lm[KP.L_WRIST] : lm[KP.R_WRIST];
+            if (nearS && nearElbow?.score > 0.28 && nearWrist?.score > 0.28) {
+                const ea = angleBetween3pts(nearS, nearElbow, nearWrist);
+                if (ea !== null) res.elbowAngle = smv('elbowAngle', ea);
+            }
+            if (nearS && nearWrist?.score > 0.28) {
+                res.wristShoulderDev = smv('wristShoulder', Math.abs(nearWrist.x - nearS.x) * 100);
+                if (res.wristShoulderDev > (pr.wristB ?? 16)) {
+                    warn.push('Polsi non sotto le spalle — aggiusta la posizione delle mani');
+                } else if (res.wristShoulderDev > (pr.wristW ?? 8)) {
+                    warn.push('Centra le mani sotto le spalle');
+                }
+            }
+        }
+
+        // Conteggio ripetizioni
         if (activeExercise === 'squat' && res.kneeAngle !== null) {
             if (repState.phase === 'up'   && res.kneeAngle < 105) repState.phase = 'down';
             else if (repState.phase === 'down' && res.kneeAngle > 155) { repState.phase = 'up'; repState.count++; }
@@ -429,9 +468,7 @@ function analyzePosture(lm, viewMode) {
 }
 
 // ── Drawing ───────────────────────────────────────────────────────────────────
-
 function drawSkeleton(lm, W, H) {
-    // Connections
     for (const { a, b, col, w } of CONNECTIONS) {
         const la = lm[a], lb = lm[b];
         if (!la || !lb) continue;
@@ -447,7 +484,6 @@ function drawSkeleton(lm, W, H) {
     }
     CTX.globalAlpha = 1;
 
-    // Joints
     for (let i = 0; i < lm.length; i++) {
         const p = lm[i];
         if (!p || p.score < 0.08) continue;
@@ -457,7 +493,6 @@ function drawSkeleton(lm, W, H) {
         const r   = key ? 7 : 4;
 
         CTX.globalAlpha = Math.min(1, 0.35 + p.score * 0.65);
-
         if (key) {
             CTX.beginPath();
             CTX.arc(x, y, r + 4, 0, Math.PI * 2);
@@ -479,6 +514,57 @@ function drawSkeleton(lm, W, H) {
     CTX.globalAlpha = 1;
 }
 
+// Punti virtuali calcolati (non dal modello): COLLO, MEZZA-COLONNA, PELVI
+function drawVirtualPoints(lm, W, H) {
+    const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
+    const lh = lm[KP.L_HIP],     rh = lm[KP.R_HIP];
+    if (!ls || !rs) return;
+
+    const sScore = (ls.score + rs.score) / 2;
+    const hScore = lh && rh ? (lh.score + rh.score) / 2 : 0;
+
+    const sMidX = (ls.x + rs.x) / 2, sMidY = (ls.y + rs.y) / 2;
+
+    // COLLO: centro spalle
+    if (sScore > 0.25) {
+        const nx = sMidX * W, ny = sMidY * H;
+        CTX.globalAlpha = Math.min(1, 0.5 + sScore * 0.4);
+        CTX.beginPath(); CTX.arc(nx, ny, 5, 0, Math.PI * 2);
+        CTX.fillStyle = '#ffd700'; CTX.fill();
+        CTX.beginPath(); CTX.arc(nx, ny, 9, 0, Math.PI * 2);
+        CTX.strokeStyle = '#ffd70033'; CTX.lineWidth = 2; CTX.stroke();
+    }
+
+    if (sScore > 0.25 && hScore > 0.25) {
+        const hMidX = (lh.x + rh.x) / 2, hMidY = (lh.y + rh.y) / 2;
+        const minSH = Math.min(sScore, hScore);
+
+        // PELVI: centro fianchi
+        const px = hMidX * W, py = hMidY * H;
+        CTX.globalAlpha = Math.min(1, 0.5 + minSH * 0.4);
+        CTX.beginPath(); CTX.arc(px, py, 5, 0, Math.PI * 2);
+        CTX.fillStyle = '#ff9f43'; CTX.fill();
+        CTX.beginPath(); CTX.arc(px, py, 9, 0, Math.PI * 2);
+        CTX.strokeStyle = '#ff9f4333'; CTX.lineWidth = 2; CTX.stroke();
+
+        // MEZZA-COLONNA: punto intermedio tra collo e pelvi
+        const msx = ((sMidX + hMidX) / 2) * W;
+        const msy = ((sMidY + hMidY) / 2) * H;
+        CTX.globalAlpha = Math.min(1, 0.45 + minSH * 0.4);
+        CTX.beginPath(); CTX.arc(msx, msy, 4, 0, Math.PI * 2);
+        CTX.fillStyle = '#ffd700'; CTX.fill();
+
+        // Linea virtuale spine center (tratteggiata sottile)
+        CTX.beginPath();
+        CTX.moveTo(sMidX * W, sMidY * H);
+        CTX.lineTo(hMidX * W, hMidY * H);
+        CTX.strokeStyle = 'rgba(255,215,0,0.18)';
+        CTX.lineWidth = 6; CTX.setLineDash([]); CTX.stroke();
+    }
+
+    CTX.globalAlpha = 1;
+}
+
 function drawSpineLine(lm, W, H, posture, viewMode) {
     const ls = lm[KP.L_SHOULDER], rs = lm[KP.R_SHOULDER];
     const lh = lm[KP.L_HIP],     rh = lm[KP.R_HIP];
@@ -492,40 +578,35 @@ function drawSpineLine(lm, W, H, posture, viewMode) {
         ? (viewMode === 'profile-left' ? lh : rh)
         : { x:(lh.x+rh.x)/2, y:(lh.y+rh.y)/2, score:(lh.score+rh.score)/2 };
 
-    if (Math.min(spineTop.score, spineBot.score) < 0.2) return;
+    if (Math.min(spineTop.score, spineBot.score) < 0.18) return;
 
     const sX = spineTop.x * W, sY = spineTop.y * H;
     const hX = spineBot.x * W, hY = spineBot.y * H;
 
-    const col = posture.status === 'good'    ? '#FFD700'
-              : posture.status === 'warning'  ? '#ffc107'
-              : posture.status === 'bad'      ? '#ff1744'
+    const col = posture.status === 'good'   ? '#FFD700'
+              : posture.status === 'warning' ? '#ffc107'
+              : posture.status === 'bad'     ? '#ff1744'
               : '#FFD700';
 
-    // Glow
     CTX.beginPath(); CTX.moveTo(sX, sY); CTX.lineTo(hX, hY);
     CTX.strokeStyle = col + '25'; CTX.lineWidth = 20; CTX.stroke();
 
-    // Dashed spine line
     CTX.beginPath(); CTX.moveTo(sX, sY); CTX.lineTo(hX, hY);
     CTX.strokeStyle = col; CTX.lineWidth = 2.5;
     CTX.setLineDash([8, 5]); CTX.stroke(); CTX.setLineDash([]);
 
-    // Endpoint dots
     for (const [px, py] of [[sX,sY],[hX,hY]]) {
-        CTX.beginPath(); CTX.arc(px, py, 5, 0, Math.PI*2);
+        CTX.beginPath(); CTX.arc(px, py, 5, 0, Math.PI * 2);
         CTX.fillStyle = col; CTX.fill();
     }
 
     if (!posture.visible) return;
 
-    // Vertical reference at hip
     const arcR = 40;
     CTX.beginPath(); CTX.moveTo(hX, hY); CTX.lineTo(hX, hY - arcR - 14);
     CTX.strokeStyle = 'rgba(255,255,255,0.25)'; CTX.lineWidth = 1;
     CTX.setLineDash([4,4]); CTX.stroke(); CTX.setLineDash([]);
 
-    // Angle arc
     const angleDeg = posture.screenAngle;
     const a0 = -Math.PI / 2;
     const a1 = a0 + angleDeg * Math.PI / 180;
@@ -533,20 +614,18 @@ function drawSpineLine(lm, W, H, posture, viewMode) {
     CTX.arc(hX, hY, arcR, Math.min(a0,a1), Math.max(a0,a1));
     CTX.strokeStyle = col; CTX.lineWidth = 2; CTX.stroke();
 
-    // Angle label
     const deg = Math.round(Math.abs(angleDeg));
-    if (deg > 1 && spineTop.score > 0.4) {
+    if (deg > 1 && spineTop.score > 0.35) {
         CTX.font      = 'bold 11px IBM Plex Mono, monospace';
         CTX.fillStyle = col;
         CTX.fillText(deg + '°', hX + (angleDeg >= 0 ? arcR + 6 : -(arcR + 32)), hY - 8);
     }
 
-    // Profile: plumb line from nose to give full-body reference
     if (isProfile) {
-        const nose = lm[KP.NOSE];
-        if (nose && nose.score > 0.4) {
+        const noseP = lm[KP.NOSE];
+        if (noseP && noseP.score > 0.35) {
             CTX.beginPath();
-            CTX.moveTo(nose.x * W, nose.y * H);
+            CTX.moveTo(noseP.x * W, noseP.y * H);
             CTX.lineTo(hX, hY + 20);
             CTX.strokeStyle = 'rgba(255,255,255,0.13)';
             CTX.lineWidth = 1;
@@ -556,7 +635,6 @@ function drawSpineLine(lm, W, H, posture, viewMode) {
 }
 
 // ── UI ────────────────────────────────────────────────────────────────────────
-
 function setMV(el, row, text, state) {
     el.textContent = text;
     el.className   = 'm-val ' + (state || '');
@@ -565,12 +643,11 @@ function setMV(el, row, text, state) {
 
 function updateUI(posture, viewMode, hasBody) {
     const isProfile = viewMode !== 'frontal';
+    const ex = EXERCISES[activeExercise];
 
     viewBadge.textContent = isProfile ? 'PROFILO' : 'FRONTALE';
     viewBadge.className   = 'view-badge' + (isProfile ? ' profile' : '');
 
-    // Update metric labels per view / exercise
-    const ex = EXERCISES[activeExercise];
     if (isProfile) {
         if (activeExercise === 'squat') {
             lblLat.textContent = 'SCHIENA'; lblFwd.textContent = 'GINOCCHIO'; lblSpalle.textContent = 'PROFONDITÀ';
@@ -583,26 +660,26 @@ function updateUI(posture, viewMode, hasBody) {
         lblLat.textContent = 'INCL. LAT.'; lblFwd.textContent = 'ASIMM. SPALLE'; lblSpalle.textContent = 'ALIGN. ANCHE';
     }
 
-    // Score
     const ss = posture.score >= 70 ? 'good' : posture.score >= 40 ? 'warning' : 'bad';
     setMV(vScore, document.getElementById('m-score'), posture.score + '%', ss);
 
     if (!posture.visible || !hasBody) {
         angleVal.textContent = '—°'; angleBadge.className = '';
         setMV(vLat, mLat, '—', ''); setMV(vFwd, mFwd, '—', '');
-        setMV(vSpalle, mSpalle, '—', '');
+        setMV(vSpalle, mSpalle, '—', ''); setMV(vExtra, mExtra, '—', '');
+        lblExtra.textContent = '—';
         warningBanner.classList.add('hidden');
         goodBanner.classList.add('hidden');
         repBadge.classList.add('hidden');
-        if (vfCorners) { vfCorners.classList.remove('good','bad'); }
+        if (vfCorners) vfCorners.classList.remove('good','bad');
         return;
     }
 
-    // Esercizi laterali: invita a girarsi di profilo se vista frontale
     if (activeExercise !== 'inpiedi' && !isProfile) {
         angleVal.textContent = '—°'; angleBadge.className = '';
         setMV(vLat, mLat, '—', ''); setMV(vFwd, mFwd, '—', '');
-        setMV(vSpalle, mSpalle, '—', '');
+        setMV(vSpalle, mSpalle, '—', ''); setMV(vExtra, mExtra, '—', '');
+        lblExtra.textContent = '—';
         warningText.textContent = '⚠ GIRATI DI PROFILO';
         warningBanner.classList.remove('hidden');
         goodBanner.classList.add('hidden');
@@ -610,7 +687,6 @@ function updateUI(posture, viewMode, hasBody) {
         return;
     }
 
-    // Rep counter badge
     if (activeExercise === 'squat' || activeExercise === 'pushup') {
         repBadge.classList.remove('hidden');
         repCountEl.textContent = repState.count;
@@ -618,7 +694,6 @@ function updateUI(posture, viewMode, hasBody) {
         repBadge.classList.add('hidden');
     }
 
-    // Primary angle badge
     const mainAng = Math.round(Math.abs(posture.screenAngle));
     const { pr, fr } = ex;
 
@@ -637,7 +712,6 @@ function updateUI(posture, viewMode, hasBody) {
     }
 
     if (!isProfile) {
-        // ── Frontale ──
         setMV(vLat, mLat, mainAng + '°',
             mainAng < fr.spineW ? 'good' : mainAng < fr.spineB ? 'warning' : 'bad');
         setMV(vFwd, mFwd, Math.round(posture.shoulderAsym) + '%',
@@ -645,17 +719,28 @@ function updateUI(posture, viewMode, hasBody) {
         setMV(vSpalle, mSpalle, Math.round(posture.hipAsym) + '%',
             posture.hipAsym < fr.hipW ? 'good' : posture.hipAsym < fr.hipB ? 'warning' : 'bad');
 
+        if (activeExercise === 'squat' && posture.kneeValgus !== null) {
+            lblExtra.textContent = 'VALGUS GINOCCHIO';
+            const kv = posture.kneeValgus ?? 0;
+            setMV(vExtra, mExtra, Math.round(kv) + '%',
+                kv < fr.kneeValgusW ? 'good' : kv < fr.kneeValgusB ? 'warning' : 'bad');
+        } else if (posture.earAsym !== null) {
+            lblExtra.textContent = 'SIMM. ORECCHIE';
+            const ea = posture.earAsym ?? 0;
+            setMV(vExtra, mExtra, Math.round(ea) + '%',
+                ea < (fr.earW ?? 4) ? 'good' : ea < (fr.earB ?? 8) ? 'warning' : 'bad');
+        } else {
+            lblExtra.textContent = '—'; setMV(vExtra, mExtra, '—', '');
+        }
+
     } else if (activeExercise === 'squat') {
-        // ── Squat: schiena / ginocchio / profondità ──
         setMV(vLat, mLat, mainAng + '°',
             mainAng < pr.fwdW ? 'good' : mainAng < pr.fwdB ? 'warning' : 'bad');
-
         if (posture.kneeAngle !== null) {
             const ka = posture.kneeAngle;
             setMV(vFwd, mFwd, Math.round(ka) + '°',
                 ka < 100 ? 'good' : ka < pr.kneeThr ? 'warning' : 'bad');
         } else { setMV(vFwd, mFwd, '—', ''); }
-
         if (posture.hipDepth !== null) {
             const d = posture.hipDepth;
             setMV(vSpalle, mSpalle,
@@ -663,35 +748,53 @@ function updateUI(posture, viewMode, hasBody) {
                 d > 0.04 ? 'good'     : d > -0.04 ? 'warning' : 'bad');
         } else { setMV(vSpalle, mSpalle, '—', ''); }
 
+        lblExtra.textContent = 'INCL. TIBIA';
+        if (posture.shinLean !== null && posture.shinLean !== undefined) {
+            const sl = posture.shinLean;
+            setMV(vExtra, mExtra, Math.round(sl) + '°',
+                sl > (pr.shinLeanMin ?? 8) ? 'good' : sl > 0 ? 'warning' : 'bad');
+        } else { setMV(vExtra, mExtra, '—', ''); }
+
     } else if (activeExercise === 'pushup') {
-        // ── Push-up: piano corpo / gomito ──
         const devH = Math.round(Math.abs(90 - mainAng));
         const a = mainAng;
         setMV(vLat, mLat, devH + '°',
             (a >= pr.angLowW && a <= pr.angHighW) ? 'good'
             : (a < pr.angLowB || a > pr.angHighB) ? 'bad' : 'warning');
-
         if (posture.elbowAngle !== null) {
             const ea = posture.elbowAngle;
-            // In basso (gomito chiuso) = buono; in alto (dritto) = top position
             setMV(vFwd, mFwd, Math.round(ea) + '°',
                 ea < 100 ? 'good' : ea < 140 ? 'warning' : 'bad');
         } else { setMV(vFwd, mFwd, '—', ''); }
-
         setMV(vSpalle, mSpalle, '—', '');
+
+        lblExtra.textContent = 'OFFSET POLSO';
+        if (posture.wristShoulderDev !== null && posture.wristShoulderDev !== undefined) {
+            const wd = posture.wristShoulderDev;
+            setMV(vExtra, mExtra, Math.round(wd) + '%',
+                wd < (pr.wristW ?? 8) ? 'good' : wd < (pr.wristB ?? 16) ? 'warning' : 'bad');
+        } else { setMV(vExtra, mExtra, '—', ''); }
 
     } else {
-        // ── Seduto / In Piedi profilo ──
         setMV(vLat, mLat, mainAng + '°',
             mainAng < pr.fwdW ? 'good' : mainAng < pr.fwdB ? 'warning' : 'bad');
-        const hf = posture.headFwd;
-        setMV(vFwd, mFwd, Math.round(hf) + '%',
-            hf < pr.headW ? 'good' : hf < pr.headB ? 'warning' : 'bad');
+        setMV(vFwd, mFwd, Math.round(posture.headFwd) + '%',
+            posture.headFwd < pr.headW ? 'good' : posture.headFwd < pr.headB ? 'warning' : 'bad');
         setMV(vSpalle, mSpalle, '—', '');
+
+        lblExtra.textContent = 'AVANZ. COLLO';
+        if (posture.neckFwd !== null && posture.neckFwd !== undefined) {
+            const nf = posture.neckFwd;
+            setMV(vExtra, mExtra, Math.round(nf) + '%',
+                nf < (pr.neckW ?? 8) ? 'good' : nf < (pr.neckB ?? 16) ? 'warning' : 'bad');
+        } else { setMV(vExtra, mExtra, '—', ''); }
     }
 
     const { warnings, status } = posture;
-    if (vfCorners) { vfCorners.classList.toggle('good', status === 'good'); vfCorners.classList.toggle('bad', status === 'bad'); }
+    if (vfCorners) {
+        vfCorners.classList.toggle('good', status === 'good');
+        vfCorners.classList.toggle('bad', status === 'bad');
+    }
     if (status === 'good') {
         warningBanner.classList.add('hidden');
         goodBanner.classList.remove('hidden');
@@ -707,20 +810,17 @@ function updateUI(posture, viewMode, hasBody) {
         const wi = Math.floor(Date.now() / 2400) % warnings.length;
         warningText.textContent = '⚠ ' + warnings[wi].toUpperCase();
         warningBanner.classList.remove('hidden');
-        // Speak: force if status just changed (e.g. was good, now bad)
         speak(warnings[0], status !== lastStatus);
     }
     lastStatus = status;
 
-    // Announce completed reps
     if (repState.count > lastRepCount) {
         lastRepCount = repState.count;
         speak(String(repState.count), true);
     }
 }
 
-// ── Detect loop ───────────────────────────────────────────────────────────────
-
+// ── Detection loop ────────────────────────────────────────────────────────────
 function onPoseResults(keypoints) {
     if (CANVAS.width  !== VIDEO.videoWidth)  CANVAS.width  = VIDEO.videoWidth  || 640;
     if (CANVAS.height !== VIDEO.videoHeight) CANVAS.height = VIDEO.videoHeight || 480;
@@ -730,23 +830,20 @@ function onPoseResults(keypoints) {
     const vW = VIDEO.videoWidth  || W;
     const vH = VIDEO.videoHeight || H;
 
-    // Normalize pixel coords → [0,1]
     const rawKps = (keypoints && keypoints.length > 0)
         ? keypoints.map(kp => ({ x: kp.x / vW, y: kp.y / vH, score: kp.score ?? 0 }))
         : null;
 
-    // Validate: reject objects, shadows, partial scenes
     const validDetection = rawKps && isValidPerson(rawKps);
 
     if (validDetection) {
         missingFrames = 0;
-        smoothKeypoints(rawKps);      // update EMA buffer
+        smoothKeypoints(rawKps);
     } else {
         missingFrames++;
-        if (missingFrames > MAX_MISSING) smoothedKps = null;   // expire
+        if (missingFrames > MAX_MISSING) smoothedKps = null;
     }
 
-    // Use smoothed buffer — stays valid for MAX_MISSING frames after last good frame
     const lm      = (smoothedKps && missingFrames <= MAX_MISSING) ? smoothedKps : null;
     const hasBody = !!lm;
 
@@ -754,6 +851,7 @@ function onPoseResults(keypoints) {
     const posture  = analyzePosture(lm ?? [], viewMode);
 
     if (hasBody) {
+        drawVirtualPoints(lm, W, H);    // Punti calcolati: collo, mezza-colonna, pelvi
         drawSkeleton(lm, W, H);
         drawSpineLine(lm, W, H, posture, viewMode);
     }
@@ -778,7 +876,6 @@ async function loop() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-
 async function init() {
     try {
         await tf.ready();
@@ -790,8 +887,8 @@ async function init() {
             poseDetection.SupportedModels.MoveNet,
             {
                 modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER,
-                enableSmoothing: false,   // we apply our own EMA — disable library smoothing
-                minPoseScore: 0.30,       // reject low-confidence non-person detections
+                enableSmoothing: false,
+                minPoseScore: 0.25,
             }
         );
 
@@ -819,7 +916,7 @@ async function init() {
     }
 }
 
-// ── Exercise selection ────────────────────────────────────────────────────────
+// ── Selezione esercizio ───────────────────────────────────────────────────────
 document.querySelectorAll('.ex-card').forEach(btn => {
     btn.addEventListener('click', () => {
         activeExercise = btn.dataset.ex;
