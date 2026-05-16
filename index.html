@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SKELETON — Analisi Posturale</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Bebas+Neue&display=swap"
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -17,15 +18,19 @@
         <div class="scan-line"></div>
 
         <!-- Torna a Fitora -->
-        <a href="https://galaxyluca952.github.io/FITORA-2/" class="ex-back-link">← FITORA</a>
+        <a href="https://galaxyluca952.github.io/FITORA-2/" class="ex-back-link">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Fitora
+        </a>
 
         <div class="ex-inner">
 
             <div class="ex-header">
-                <div class="ex-logo">◈ SKELETON</div>
-                <div class="ex-tagline">ANALISI POSTURALE IN TEMPO REALE</div>
-                <div class="ex-divider-line"></div>
-                <div class="ex-prompt">SELEZIONA MODALITÀ DI ANALISI</div>
+                <div class="ex-logo">SKELETON</div>
+                <div class="ex-tagline">Analisi posturale in tempo reale</div>
+                <p class="ex-prompt">Scegli una modalità per iniziare</p>
             </div>
 
             <div class="ex-grid">
@@ -109,7 +114,11 @@
         <div id="topbar">
             <div class="tb-left">
                 <!-- Torna alla selezione esercizi -->
-                <button class="home-btn" id="back-btn" title="Torna alla selezione">←</button>
+                <button class="home-btn" id="back-btn" title="Torna alla selezione" aria-label="Torna alla selezione">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
                 <div class="brand">◈ SKELETON</div>
             </div>
             <div class="tb-center">
