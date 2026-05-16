@@ -421,9 +421,9 @@ body {
 }
 
 .badge-label {
-    font-size: 8px;
+    font-size: 12px;
     letter-spacing: 0.25em;
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.8);
     margin-top: 3px;
     font-family: var(--mono);
 }
