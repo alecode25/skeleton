@@ -916,6 +916,44 @@ async function init() {
     }
 }
 
+// ── Torna alla selezione ─────────────────────────────────────────────────────
+document.getElementById('back-btn').addEventListener('click', () => {
+    // Ferma il loop di rilevamento
+    looping = false;
+
+    // Ferma la fotocamera
+    if (VIDEO.srcObject) {
+        VIDEO.srcObject.getTracks().forEach(t => t.stop());
+        VIDEO.srcObject = null;
+    }
+
+    // Pulisce il canvas
+    CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+
+    // Ferma DeepFit (se il server è attivo)
+    fetch('/api/deepfit/stop', { method: 'POST' }).catch(() => {});
+
+    // Reset stato
+    smoothedKps   = null;
+    missingFrames = 0;
+    resetSmoothState();
+    synth.cancel();
+    lastStatus    = 'unknown';
+    lastRepCount  = 0;
+
+    // Resetta UI
+    statusDot.className    = 'sdot';
+    statusText.textContent = 'IN ATTESA';
+    loadingOv.classList.add('hidden');
+    warningBanner.classList.add('hidden');
+    goodBanner.classList.add('hidden');
+    repBadge.classList.add('hidden');
+    if (vfCorners) vfCorners.classList.remove('good', 'bad');
+
+    // Mostra la schermata di selezione
+    document.getElementById('exercise-select').classList.remove('hidden');
+});
+
 // ── Selezione esercizio ───────────────────────────────────────────────────────
 document.querySelectorAll('.ex-card').forEach(btn => {
     btn.addEventListener('click', () => {
